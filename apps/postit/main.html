@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Postit</title>
+  <link rel="stylesheet" href="/postit/styles/jquery-ui.css">
+  <script src="/postit/scripts/jquery.js"></script>
+  <script src="/postit/scripts/jquery-ui.js"></script>
+  <style>
+    body, html { height: 100%; }
+    .draggable { width: 150px; height: 150px; padding: 0.5em; border: 1px solid}
+    fieldset { padding:0; border:0; margin-top:25px; }
+    label, input { display:block; }
+  </style>
+  <script type="text/javascript">
+    <!--
+	function save_position(event, ui) {
+	  // ajax.get (ui.id, ui.position.top, ui.position.left)
+	  // TODO save the position
+	}
+	function load_postit() {
+	  jQuery.ajax("/postit/load-postit", {
+	    success: function(data, status, jqXHR) {
+	      // datum must have the followings
+	      // id, note, top, left, width, height, 
+	      // text-color, background-color, creation-date
+	      var area = $("#postits");
+	      for (var i = 0; i < data.length; i++) {
+	        var style = "top:" + data[i].top + "px;";
+		style += "left:" + data[i].left + "px;";
+		style += "width:" + data[i].width + "px;";
+		style += "height:" + data[i].height + "px;";
+
+	        jQuery("<div/>", {
+		  "id":      data[i].id,
+		  "class":   "draggable ui-widget-content",
+		  "style":   style
+		}).append(data[i].note)
+		  .appendTo(area);
+	      }
+	      
+	      $(".draggable").draggable({
+                stop: save_position,
+		containment: "parent"
+	      }).resizable(); 
+	    }
+	  });
+	}
+	function postit() {
+	  var note = $("#note").val();
+	  var username = "anonymous"; // for now
+	  jQuery.ajax("/postit/create-postit", {
+	    type: "POST",
+	    data: { "note": note, "username" : username },
+	    success: load_postit // argument will be ignored
+	  });
+	  
+	}
+	$(function() {
+	  var dialog, form;
+
+	  dialog = $("#dialog").dialog({
+	    autoOpen: false,
+	    height: 500,
+	    width: 550,
+	    modal: true,
+	    buttons: {
+	      "Post It": postit,
+	      Cancel: function() { dialog.dialog("close"); }
+	    },
+	    close: function() { form[0].reset(); }
+	  });
+	  
+	  form = dialog.find("form").on("submit", function(event) {
+	    event.preventDefault();
+	    postit();
+	  });
+	  $("#new-postit").button().on("click", function() {
+	    dialog.dialog("open");
+	  });
+	  load_postit();
+	});
+      -->
+  </script>
+</head>
+<body>
+  <div id="control" style="float: left; width: 10%;">
+    <div id="dialog" title="New">
+      <form action="#">
+	<fieldset>
+	  <label for="name">Note</label>
+	  <textarea id="note" name="note"
+		    class="text" cols="30" rows="10"></textarea>
+	  <input type="submit" tabindex="-1" 
+		 style="position:absolute; top:-1000px">
+	</fieldset>
+      </form>
+    </div>
+    <button id="new-postit">Create</button>
+  </div>
+
+  <div id="postits" style="float: right; width: 90%; height: 100%;">
+  </div>
+</body>
+</html>
+
