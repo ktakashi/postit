@@ -41,6 +41,7 @@
 	    (match)
 	    (text json)
 	    (dbi)
+	    (srfi :19)
 	    (srfi :39)
 	    (clos user))
 
@@ -71,7 +72,12 @@
 	 (lambda (out)
 	   (json-write json out))))
       
-    ;; TODO user management
+      (define (timestamp->millisecond t)
+	(let ((s (time-second t))
+	      (n (time-nanosecond t)))
+	  (+ (* s 1000) (div n 1000000))))
+
+      ;; TODO user management
       (let* ((q (dbi-execute-query-using-connection! conn +sql:load-postit+))
 	     (notes (dbi-query-map q
 		      (match-lambda 
@@ -87,9 +93,9 @@
 			  (left   . ,y)
 			  (width  . ,w)
 			  (height . ,h)
-			  (text-color . ,tc)
-			  (background-color . ,bc)
-			  (creation-date . ,date)))))))
+			  (textColor . ,tc)
+			  (backgroundColor . ,bc)
+			  (creationDate . ,(timestamp->millisecond date))))))))
 	(dbi-close conn)
 	(values 200 'application/json (json->string (list->vector notes))))))
 
@@ -102,8 +108,8 @@
 
   (define-constant +sql:insert-postit+
     "insert into postit \
-       (id, userid, postit, text_color_id, bg_color_id) \
-     select (select max(id)+1 from postit), u.id, ?, ?, ? \
+       (userid, postit, text_color_id, bg_color_id) \
+     select u.id, ?, ?, ? \
      from users u where username = ?")
     
   (define (create-postit req) 
@@ -111,8 +117,7 @@
 
     (parameterize ((current-directory 
 		    (plato-current-path 
-		     (plato-parent-context (*plato-current-context*))))
-		   (*json-map-type* 'alist))
+		     (plato-parent-context (*plato-current-context*)))))
       (define conn (dbi-connect +dsn+))
       (let ((q (dbi-prepare conn +sql:insert-postit+)))
 	(dbi-bind-parameter! q 4 (slot-ref request 'username))
@@ -125,9 +130,67 @@
 	    (dbi-bind-parameter! q 3 (slot-ref request 'bg-color-id))
 	    (dbi-bind-parameter! q 3 0)) ;; white
 	(dbi-execute! q)
+	(dbi-commit! q)
 	(dbi-close q))
       (dbi-close conn)
       (values 200 'text/plan "OK")))
+
+  (define-class <position-update-request> (<converter-mixin>)
+    ((id   :converter utf8->integer)
+     (top  :converter utf8->integer)
+     (left :converter utf8->integer)))
+  (define-method write-object ((o <position-update-request>) out)
+    (format out "#<position-update-request id=~s top=~s left=~s>"
+	    (slot-ref o 'id) (slot-ref o 'top) (slot-ref o 'left)))
+
+  (define-constant +sql:position-update+
+    "update postit set x = ?, y = ? where id = ?")
+  (define (update-position req) 
+    (define request (cuberteria-map-http-request! 
+		     (make <position-update-request>) req))
+
+    (parameterize ((current-directory 
+		    (plato-current-path 
+		     (plato-parent-context (*plato-current-context*)))))
+      (define conn (dbi-connect +dsn+))
+      (let ((q (dbi-prepare conn +sql:position-update+)))
+	(dbi-bind-parameter! q 1 (slot-ref request 'top))
+	(dbi-bind-parameter! q 2 (slot-ref request 'left))
+	(dbi-bind-parameter! q 3 (slot-ref request 'id))
+	(dbi-execute! q)
+	(dbi-commit! q)
+	(dbi-close q))
+      (dbi-close conn)
+      (values 200 'text/plan "OK")))
+
+  (define-class <size-update-request> (<converter-mixin>)
+    ((id     :converter utf8->integer)
+     (width  :converter utf8->integer)
+     (height :converter utf8->integer)))
+  (define-method write-object ((o <size-update-request>) out)
+    (format out "#<size-update-request id=~s width=~s height=~s>"
+	    (slot-ref o 'id) (slot-ref o 'width) (slot-ref o 'height)))
+
+  (define-constant +sql:size-update+
+    "update postit set width = ?, height = ? where id = ?")
+  (define (update-size req) 
+    (define request (cuberteria-map-http-request! 
+		     (make <size-update-request>) req))
+
+    (parameterize ((current-directory 
+		    (plato-current-path 
+		     (plato-parent-context (*plato-current-context*)))))
+      (define conn (dbi-connect +dsn+))
+      (let ((q (dbi-prepare conn +sql:size-update+)))
+	(dbi-bind-parameter! q 1 (slot-ref request 'width))
+	(dbi-bind-parameter! q 2 (slot-ref request 'height))
+	(dbi-bind-parameter! q 3 (slot-ref request 'id))
+	(dbi-execute! q)
+	(dbi-commit! q)
+	(dbi-close q))
+      (dbi-close conn)
+      (values 200 'text/plan "OK")))
+
 
   (define (mount-paths)
     `( 
@@ -136,6 +199,8 @@
       ((GET)  #/styles\/images\/.+?\.png/  ,png-loader)
       ((GET)  "/load-postit" ,(plato-session-handler postit-loader))
       ((POST) "/create-postit" ,(plato-session-handler create-postit))
+      ((POST) "/update-position" ,(plato-session-handler update-position))
+      ((POST) "/update-size" ,(plato-session-handler update-size))
       ))
   (define (support-methods) '(GET))
 

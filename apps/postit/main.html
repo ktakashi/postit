@@ -16,7 +16,21 @@
     <!--
 	function save_position(event, ui) {
 	  // ajax.get (ui.id, ui.position.top, ui.position.left)
-	  // TODO save the position
+	  var id = $(this).attr('id');
+	  var p = ui.position;
+	  jQuery.ajax("/postit/update-position", {
+	    type: "POST",
+	    data: { "id": id, "top": p.top, "left": p.left},
+	  });	  
+	}
+	function save_size(event, ui) {
+	  // ajax.get (ui.id, ui.size.width, ui.size.height)
+	  var id = $(this).attr('id');
+	  var p = ui.size;
+	  jQuery.ajax("/postit/update-size", {
+	    type: "POST",
+	    data: { "id": id, "width": p.width, "height": p.height},
+	  });	  
 	}
 	function load_postit() {
 	  jQuery.ajax("/postit/load-postit", {
@@ -25,40 +39,56 @@
 	      // id, note, top, left, width, height, 
 	      // text-color, background-color, creation-date
 	      var area = $("#postits");
+	      area.empty();
+
 	      for (var i = 0; i < data.length; i++) {
 	        var style = "top:" + data[i].top + "px;";
 		style += "left:" + data[i].left + "px;";
 		style += "width:" + data[i].width + "px;";
 		style += "height:" + data[i].height + "px;";
 
-	        jQuery("<div/>", {
+		var d = new Date(data[i].creationDate);
+		var date = jQuery("<div/>", {
+		  "style": "bottom: 0px; position: absolute;"
+		}).append("Created on: ")
+		  .append(d.toLocaleDateString())
+		  .append(" ")
+		  .append(d.toLocaleTimeString());
+	        var div = jQuery("<div/>", {
 		  "id":      data[i].id,
 		  "class":   "draggable ui-widget-content",
 		  "style":   style
 		}).append(data[i].note)
+		  .append(date)
+		  .on("click", function(event) {
+		    $(".draggable").css({"z-index": 10});
+		    $(this).css({"z-index": 100});
+		  })
 		  .appendTo(area);
 	      }
 	      
 	      $(".draggable").draggable({
                 stop: save_position,
 		containment: "parent"
-	      }).resizable(); 
+	      }).resizable({
+	        stop: save_size,
+	      }); 
 	    }
 	  });
 	}
-	function postit() {
-	  var note = $("#note").val();
-	  var username = "anonymous"; // for now
-	  jQuery.ajax("/postit/create-postit", {
-	    type: "POST",
-	    data: { "note": note, "username" : username },
-	    success: load_postit // argument will be ignored
-	  });
-	  
-	}
+
 	$(function() {
 	  var dialog, form;
-
+	  function postit() {
+	    var note = $("#note").val();
+	    var username = "anonymous"; // for now
+	    jQuery.ajax("/postit/create-postit", {
+	      type: "POST",
+	      data: { "note": note, "username" : username },
+	      success: load_postit // argument will be ignored
+	    });
+	    dialog.dialog("close");
+	  }
 	  dialog = $("#dialog").dialog({
 	    autoOpen: false,
 	    height: 500,
