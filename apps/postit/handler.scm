@@ -135,9 +135,11 @@
       (dbi-close conn)
       (values 200 'text/plan "OK")))
 
-  (define-class <position-update-request> (<converter-mixin>)
-    ((id   :converter utf8->integer)
-     (top  :converter utf8->integer)
+  (define-class <id-request> (<converter-mixin>)
+    ((id   :converter utf8->integer)))
+
+  (define-class <position-update-request> (<id-request> <converter-mixin>)
+    ((top  :converter utf8->integer)
      (left :converter utf8->integer)))
   (define-method write-object ((o <position-update-request>) out)
     (format out "#<position-update-request id=~s top=~s left=~s>"
@@ -163,9 +165,8 @@
       (dbi-close conn)
       (values 200 'text/plan "OK")))
 
-  (define-class <size-update-request> (<converter-mixin>)
-    ((id     :converter utf8->integer)
-     (width  :converter utf8->integer)
+  (define-class <size-update-request> (<id-request> <converter-mixin>)
+    ((width  :converter utf8->integer)
      (height :converter utf8->integer)))
   (define-method write-object ((o <size-update-request>) out)
     (format out "#<size-update-request id=~s width=~s height=~s>"
@@ -191,6 +192,22 @@
       (dbi-close conn)
       (values 200 'text/plan "OK")))
 
+  (define-constant +sql:delete+ "delete from postit where id = ?")
+  (define (remove-postit req)
+    (define request (cuberteria-map-http-request! 
+		     (make <id-request>) req))
+    (parameterize ((current-directory 
+		    (plato-current-path 
+		     (plato-parent-context (*plato-current-context*)))))
+      (define conn (dbi-connect +dsn+))
+      (let ((q (dbi-prepare conn +sql:delete+)))
+	(dbi-bind-parameter! q 1 (slot-ref request 'id))
+	(dbi-execute! q)
+	(dbi-commit! q)
+	(dbi-close q))
+      (dbi-close conn)
+      (values 200 'text/plan "OK")))
+
 
   (define (mount-paths)
     `( 
@@ -201,6 +218,7 @@
       ((POST) "/create-postit" ,(plato-session-handler create-postit))
       ((POST) "/update-position" ,(plato-session-handler update-position))
       ((POST) "/update-size" ,(plato-session-handler update-size))
+      ((POST) "/remove-postit" ,(plato-session-handler remove-postit))
       ))
   (define (support-methods) '(GET))
 

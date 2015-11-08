@@ -30,8 +30,17 @@
 	  jQuery.ajax("/postit/update-size", {
 	    type: "POST",
 	    data: { "id": id, "width": p.width, "height": p.height},
-	  });	  
+	  });
 	}
+	function remove_postit(event) {
+	  var id = $(this).attr('postit');
+	  jQuery.ajax("/postit/remove-postit", {
+	    type: "POST",
+	    data: {"id": id},
+	  });
+	  $("#" + id).remove();
+	}
+
 	function load_postit() {
 	  jQuery.ajax("/postit/load-postit", {
 	    success: function(data, status, jqXHR) {
@@ -54,11 +63,19 @@
 		  .append(d.toLocaleDateString())
 		  .append(" ")
 		  .append(d.toLocaleTimeString());
+		var close = jQuery("<a>", {
+		  "href": "javascript:void(0)",
+		  "class": "ui-icon ui-icon-circle-close",
+		  "style": "position: absolute; top: 0px; right:0px",
+		  "postit": data[i].id,
+		}).on("click", remove_postit);
+
 	        var div = jQuery("<div/>", {
 		  "id":      data[i].id,
 		  "class":   "draggable ui-widget-content",
 		  "style":   style
 		}).append(data[i].note)
+		  .append(close)
 		  .append(date)
 		  .on("click", function(event) {
 		    $(".draggable").css({"z-index": 10});
