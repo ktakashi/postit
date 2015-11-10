@@ -84,11 +84,13 @@
 		       (#(id postit x y w h tc bc date)
 			`((id     . ,id) 
 			  ;; clob is may be text
-			  (note   . ,(if (string? postit) 
-					 postit
-					 ;; i think should be string port.
-					 (utf8->string 
-					  (get-bytevector-all postit))))
+			  (note   . ,(cond ((string? postit) 
+					    postit)
+					   ((null? postit) "")
+					    ;; i think should be string port.
+					   (else
+					    (utf8->string 
+					     (get-bytevector-all postit)))))
 			  (top    . ,x)
 			  (left   . ,y)
 			  (width  . ,w)

@@ -10,8 +10,8 @@
     body, html { height: 100%; }
     .draggable { width: 150px; height: 150px; padding: 0.5em; border: 1px solid}
     fieldset { padding:0; border:0; margin-top:25px; }
-    label, input .postit { display:block; }
-    label, input .postit { display:inline; }
+    label, input { display:block; }
+    label, select { display:inline; }
   </style>
   <script type="text/javascript">
     <!--
@@ -41,22 +41,23 @@
 	  });
 	  $("#" + id).remove();
 	}
-	function load_colors() {
+	function decimal_to_rgbhex(i) {
+	  var hex = i.toString(16);
+	  var remain = 6-hex.length;
+	  for (var i = 0; i < remain; i++) hex = '0' + hex;
+	  return hex;
+	}
+	function load_colors(id) {
 	  jQuery.ajax("/postit/colors", {
 	    success: function(data, status, jqXHR) {
-	      var colors = $("#colors");
+	      var colors = $("#" + id);
 	      colors.empty();
 	      for (var i = 0; i < data.length; i++) {
-	        var radio = jQuery("<input>", {
-		  "type": "radio",
-		  "name": "text-color",
-		  "value": data[i].id
-		});
-		var label = jQuery("<label>", {
-		  "class": "radio",
+	        var option = jQuery("<option>", {
+		  "value": data[i].id,
+		  "style": "background-color: #" + decimal_to_rgbhex(data[i].rgb)
 		}).append(data[i].name);
-		var c = jQuery("<div>").append(radio).append(label);
-		colors.append(c);
+		colors.append(option);
 	      }
 	    }
 	  });
@@ -120,8 +121,9 @@
 	  function postit() {
 	    var note = $("#note").val();
 	    var username = "anonymous"; // for now
-	    var text_color = $("input[name=text-color]:checked");
+	    var text_color = $("#text-colors");
 	    var tc = (text_color)? text_color.val(): 1;
+
 	    jQuery.ajax("/postit/create-postit", {
 	      type: "POST",
 	      data: { "note": note, "username" : username, "text-color-id": tc },
@@ -149,7 +151,8 @@
 	    dialog.dialog("open");
 	  });
 	  load_postit();
-	  load_colors();	  
+	  load_colors("text-colors");
+	  load_colors("bg-colors");
 	});
       -->
   </script>
@@ -169,7 +172,8 @@
 	    </div>
 	    <div style="float:right; width: 20%;">
 	      <label for="name">Font colors</label>
-	      <div id="colors" ></div>
+	      <select id="text-colors" name="text-colors"></select>
+	      <select id="bg-colors" name="bg-colors"></select>
 	    </div>
 	  </div>
 	</fieldset>
