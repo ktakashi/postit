@@ -208,6 +208,27 @@
       (dbi-close conn)
       (values 200 'text/plan "OK")))
 
+  (define-constant +sql:colors+ "select id, rgb, color_name from colors")
+  (define (list-colors req)
+    (parameterize ((current-directory 
+		    (plato-current-path 
+		     (plato-parent-context (*plato-current-context*))))
+		   (*json-map-type* 'alist))
+      (define conn (dbi-connect +dsn+))
+      (define (json->string json)
+	(call-with-string-output-port
+	 (lambda (out)
+	   (json-write json out))))
+      (let* ((q (dbi-execute-query-using-connection! conn +sql:colors+))
+	     (colors (dbi-query-map q
+		      (match-lambda
+		       (#(id rgb name)
+			`((id  . ,id)
+			  (rgb . ,rgb)
+			  (name . ,name)))))))
+	(dbi-close conn)
+	(values 200 'application/json 
+		(json->string (list->vector colors))))))
 
   (define (mount-paths)
     `( 
@@ -215,6 +236,7 @@
       ((GET)  #/styles/  ,style-loader)
       ((GET)  #/styles\/images\/.+?\.png/  ,png-loader)
       ((GET)  "/load-postit" ,(plato-session-handler postit-loader))
+      ((GET)  "/colors" ,(plato-session-handler list-colors))
       ((POST) "/create-postit" ,(plato-session-handler create-postit))
       ((POST) "/update-position" ,(plato-session-handler update-position))
       ((POST) "/update-size" ,(plato-session-handler update-size))

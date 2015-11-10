@@ -38,8 +38,8 @@ create table colors (
 -- insert default data
 insert into users (id, username, password) values (0, 'anonymous', 'anonymous');
 
-insert into colors (id, rgb, color_name) values (0, 0x000000, 'white');
-insert into colors (id, rgb, color_name) values (1, 0xffffff, 'black');
+insert into colors (id, rgb, color_name) values (0, 0xffffff, 'white');
+insert into colors (id, rgb, color_name) values (1, 0x000000, 'black');
 insert into colors (id, rgb, color_name) values (2, 0xff0000, 'red');
 insert into colors (id, rgb, color_name) values (3, 0x00ff00, 'green');
 insert into colors (id, rgb, color_name) values (4, 0x0000ff, 'blue');

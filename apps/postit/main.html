@@ -10,7 +10,8 @@
     body, html { height: 100%; }
     .draggable { width: 150px; height: 150px; padding: 0.5em; border: 1px solid}
     fieldset { padding:0; border:0; margin-top:25px; }
-    label, input { display:block; }
+    label, input .postit { display:block; }
+    label, input .postit { display:inline; }
   </style>
   <script type="text/javascript">
     <!--
@@ -40,7 +41,26 @@
 	  });
 	  $("#" + id).remove();
 	}
-
+	function load_colors() {
+	  jQuery.ajax("/postit/colors", {
+	    success: function(data, status, jqXHR) {
+	      var colors = $("#colors");
+	      colors.empty();
+	      for (var i = 0; i < data.length; i++) {
+	        var radio = jQuery("<input>", {
+		  "type": "radio",
+		  "name": "text-color",
+		  "value": data[i].id
+		});
+		var label = jQuery("<label>", {
+		  "class": "radio",
+		}).append(data[i].name);
+		var c = jQuery("<div>").append(radio).append(label);
+		colors.append(c);
+	      }
+	    }
+	  });
+	}
 	function load_postit() {
 	  jQuery.ajax("/postit/load-postit", {
 	    success: function(data, status, jqXHR) {
@@ -55,6 +75,7 @@
 		style += "left:" + data[i].left + "px;";
 		style += "width:" + data[i].width + "px;";
 		style += "height:" + data[i].height + "px;";
+		style += "color: #" + data[i].textColor.toString(16) + ";";
 
 		var d = new Date(data[i].creationDate);
 		var date = jQuery("<div/>", {
@@ -99,9 +120,11 @@
 	  function postit() {
 	    var note = $("#note").val();
 	    var username = "anonymous"; // for now
+	    var text_color = $("input[name=text-color]:checked");
+	    var tc = (text_color)? text_color.val(): 1;
 	    jQuery.ajax("/postit/create-postit", {
 	      type: "POST",
-	      data: { "note": note, "username" : username },
+	      data: { "note": note, "username" : username, "text-color-id": tc },
 	      success: load_postit // argument will be ignored
 	    });
 	    dialog.dialog("close");
@@ -126,6 +149,7 @@
 	    dialog.dialog("open");
 	  });
 	  load_postit();
+	  load_colors();	  
 	});
       -->
   </script>
@@ -135,11 +159,19 @@
     <div id="dialog" title="New">
       <form action="#">
 	<fieldset>
-	  <label for="name">Note</label>
-	  <textarea id="note" name="note"
-		    class="text" cols="30" rows="10"></textarea>
-	  <input type="submit" tabindex="-1" 
-		 style="position:absolute; top:-1000px">
+	  <div style="width: 100%; position: relative;">
+	    <div style="float:left; width: 80%;">
+	      <label for="name">Note</label>
+	      <textarea id="note" name="note"
+		        class="text" cols="30" rows="10"></textarea>
+	      <input type="submit" tabindex="-1" class="postit"
+		     style="position:absolute; top:-1000px">
+	    </div>
+	    <div style="float:right; width: 20%;">
+	      <label for="name">Font colors</label>
+	      <div id="colors" ></div>
+	    </div>
+	  </div>
 	</fieldset>
       </form>
     </div>
