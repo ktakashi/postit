@@ -45,7 +45,7 @@
 	  var hex = i.toString(16);
 	  var remain = 6-hex.length;
 	  for (var i = 0; i < remain; i++) hex = '0' + hex;
-	  return hex;
+	  return "#" + hex;
 	}
 	function load_colors(id) {
 	  jQuery.ajax("/postit/colors", {
@@ -55,7 +55,7 @@
 	      for (var i = 0; i < data.length; i++) {
 	        var option = jQuery("<option>", {
 		  "value": data[i].id,
-		  "style": "background-color: #" + decimal_to_rgbhex(data[i].rgb)
+		  "style": "background-color:" + decimal_to_rgbhex(data[i].rgb)
 		}).append(data[i].name);
 		colors.append(option);
 	      }
@@ -76,7 +76,7 @@
 		style += "left:" + data[i].left + "px;";
 		style += "width:" + data[i].width + "px;";
 		style += "height:" + data[i].height + "px;";
-		style += "color: #" + data[i].textColor.toString(16) + ";";
+		style += "background-color:" + decimal_to_rgbhex(data[i].backgroundColor) + ";";
 
 		var d = new Date(data[i].creationDate);
 		var date = jQuery("<div/>", {
@@ -91,12 +91,15 @@
 		  "style": "position: absolute; top: 0px; right:0px",
 		  "postit": data[i].id,
 		}).on("click", remove_postit);
-
+		var note = jQuery("<div>", {
+		  "style": "color:" + decimal_to_rgbhex(data[i].textColor) + ";"
+		}).append(data[i].note);
+		      
 	        var div = jQuery("<div/>", {
 		  "id":      data[i].id,
-		  "class":   "draggable ui-widget-content",
+		  "class":   "draggable",
 		  "style":   style
-		}).append(data[i].note)
+		}).append(note)
 		  .append(close)
 		  .append(date)
 		  .on("click", function(event) {
@@ -121,12 +124,15 @@
 	  function postit() {
 	    var note = $("#note").val();
 	    var username = "anonymous"; // for now
-	    var text_color = $("#text-colors");
-	    var tc = (text_color)? text_color.val(): 1;
+	    var tc = $("#text-colors").val();
+	    var bg = $("#bg-colors").val();
 
 	    jQuery.ajax("/postit/create-postit", {
 	      type: "POST",
-	      data: { "note": note, "username" : username, "text-color-id": tc },
+	      data: { "note": note, 
+		      "username" : username, 
+		      "text-color-id": tc,
+		      "bg-color-id": bg},
 	      success: load_postit // argument will be ignored
 	    });
 	    dialog.dialog("close");
