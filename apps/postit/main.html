@@ -10,8 +10,8 @@
     body, html { height: 100%; }
     .draggable { width: 150px; height: 150px; padding: 0.5em; border: 1px solid}
     fieldset { padding:0; border:0; margin-top:25px; }
-    label, input { display:block; }
-    label, select { display:inline; }
+    div.note label, input { display:block; }
+    div.face label, select { display:inline; }
   </style>
   <script type="text/javascript">
     <!--
@@ -59,6 +59,10 @@
 		}).append(data[i].name);
 		colors.append(option);
 	      }
+	      colors.on("change", function(event) {
+	        var rgb_id = $(this).val();
+	        $(this).css("background-color", decimal_to_rgbhex(data[rgb_id].rgb));
+	      });
 	    }
 	  });
 	}
@@ -169,16 +173,19 @@
       <form action="#">
 	<fieldset>
 	  <div style="width: 100%; position: relative;">
-	    <div style="float:left; width: 80%;">
-	      <label for="name">Note</label>
+	    <div class="note" style="float:left; width: 70%;">
+	      <label for="note">Note</label>
 	      <textarea id="note" name="note"
 		        class="text" cols="30" rows="10"></textarea>
 	      <input type="submit" tabindex="-1" class="postit"
 		     style="position:absolute; top:-1000px">
 	    </div>
-	    <div style="float:right; width: 20%;">
-	      <label for="name">Font colors</label>
+	    <div class="face" style="float:right; width: 30%;">
+	      <h3>Colors</h3>
+	      <label for="text-colors">Font</label>
 	      <select id="text-colors" name="text-colors"></select>
+	      <br />
+	      <label for="bg-colors">Bg</label>
 	      <select id="bg-colors" name="bg-colors"></select>
 	    </div>
 	  </div>
