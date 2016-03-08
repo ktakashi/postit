@@ -38,6 +38,7 @@
 	    (cuberteria)
 	    (sagittarius)
 	    (sagittarius regex)
+	    (maquette)
 	    (match)
 	    (text json)
 	    (dbi)
@@ -50,15 +51,62 @@
   (define script-loader (cuberteria-resource-loader 'text/javascript "./js"))
   (define style-loader (cuberteria-resource-loader 'text/css "./css"))
   (define png-loader (cuberteria-resource-loader 'image/png "./images"))
+  
+  ;; TODO make it generic
+  (define-class <entity> ()
+    ((id :init-keyword :id :primary-key #t 
+	 :generator (maquette-generator "TODO")))
+    :metaclass <maquette-table-meta>)
 
-  ;; TODO I don't want to write SQL like this...
-  (define-constant +sql:load-postit+
-    "select p.id, p.postit, p.x, p.y, p.width, p.height, \
-            tc.rgb, bc.rgb, p.create_date \
-     from postit p \
-     inner join colors tc on p.text_color_id = tc.id \
-     inner join colors bc on p.bg_color_id = bc.id \
-     where userid = 0")
+  (define (timestamp->millisecond t)
+    (let ((s (time-second t))
+	  (n (time-nanosecond t)))
+      (+ (* s 1000) (div n 1000000))))
+  (define-class <entity/date> (<entity>)
+    ((create-date :init-keyword :create-date :column-name "create_date"
+		  :sql-type 'timestamp :default 'current_timestamp
+		  :json-element-name "creationDate"
+		  :->json timestamp->millisecond))
+    :metaclass <maquette-table-meta>)
+
+  (define-class <user> (<entity/date>)
+    ((username :init-keyword :username :sql-type '(varchar2 255) :unique #t
+	       :not-null? #t)
+     (password :init-keyword :password :sql-type '(varchar2 255) :not-null? #t))
+    :metaclass <maquette-table-meta>
+    :table-name 'users)
+
+  (define-class <color> (<entity>)
+    ((rgb :init-keyword :rgb :sql-type 'integer :unique #t :not-null? #t
+	  :reader color-rgb)
+     (name :init-keyword :name :sql-type '(varchar2 255) :column-name
+	   "color_name"
+	   :reader color-name))
+    :metaclass <maquette-table-meta>
+    :table-name 'colors)
+
+  (define-class <postit> (<entity/date>)
+    ((user :init-keyword :user :foreign-key (list <user> 'id) :not-null? #t
+	   :column-name "userid"
+	   :->json cuberteria-object->json)
+     (postit :init-keyword :postit :sql-type 'clob
+	     :json-element-name "note")
+     (x :init-keyword :x :sql-type 'integer :default 0)
+     (y :init-keyword :y :sql-type 'integer :default 0)
+     (width :init-keyword :width :sql-type 'integer :default 300)
+     (height :init-keyword :height :sql-type 'integer :default 300)
+     (text-color :init-keyword :text-color :foreign-key (list <color> 'id)
+		 :column-name "text_color_id"
+		 :json-element-name "textColor"
+		 :->json color-rgb)
+     (bg-color :init-keyword :bg-color :foreign-key (list <color> 'id)
+	       :column-name "bg_color_id"
+	       :json-element-name "backgroundColor"
+	       :->json color-rgb))
+    :metaclass <maquette-table-meta>)
+
+  ;; should we have this here?
+  (define maquette-context (make-maquette-context +dsn+ :auto-commit #f))
 
   ;; TODO should we pool connections?
   (define (postit-loader req)
@@ -66,40 +114,17 @@
 		    (plato-current-path 
 		     (plato-parent-context (*plato-current-context*))))
 		   (*json-map-type* 'alist))
-      (define conn (dbi-connect +dsn+))
       (define (json->string json)
 	(call-with-string-output-port
 	 (lambda (out)
 	   (json-write json out))))
       
-      (define (timestamp->millisecond t)
-	(let ((s (time-second t))
-	      (n (time-nanosecond t)))
-	  (+ (* s 1000) (div n 1000000))))
-
-      ;; TODO user management
-      (let* ((q (dbi-execute-query-using-connection! conn +sql:load-postit+))
-	     (notes (dbi-query-map q
-		      (match-lambda 
-		       (#(id postit x y w h tc bc date)
-			`((id     . ,id) 
-			  ;; clob is may be text
-			  (note   . ,(cond ((string? postit) 
-					    postit)
-					   ((null? postit) "")
-					    ;; i think should be string port.
-					   (else
-					    (utf8->string 
-					     (get-bytevector-all postit)))))
-			  (top    . ,x)
-			  (left   . ,y)
-			  (width  . ,w)
-			  (height . ,h)
-			  (textColor . ,tc)
-			  (backgroundColor . ,bc)
-			  (creationDate . ,(timestamp->millisecond date))))))))
-	(dbi-close conn)
-	(values 200 'application/json (json->string (list->vector notes))))))
+      (define user-template (make <user> :id 0))
+      (let ((r (maquette-query maquette-context <postit> 
+			       #f)))
+	(values 200 'application/json
+		(json->string (list->vector 
+			       (map cuberteria-object->json r)))))))
 
   (define (utf8->integer bv) (string->number (utf8->string bv)))
   (define-class <create-request> (<converter-mixin>)
