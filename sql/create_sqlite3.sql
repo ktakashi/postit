@@ -44,6 +44,9 @@ insert into colors (id, rgb, color_name) values (2, 0xff0000, 'red');
 insert into colors (id, rgb, color_name) values (3, 0x00ff00, 'green');
 insert into colors (id, rgb, color_name) values (4, 0x0000ff, 'blue');
 
+-- Kludge
+insert into sqlite_sequence (name, seq) values ('postit', 0);
+insert into sqlite_sequence (name, seq) values ('user_info', 0);
 
 -- constraints
 -- Very unfortunately, SQLite doesn't have foreign key constraint

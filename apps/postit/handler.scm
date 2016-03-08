@@ -2,7 +2,7 @@
 ;;;
 ;;; postit - Simple postit application
 ;;;  
-;;;   Copyright (c) 2015  Takashi Kato  <ktakashi@ymail.com>
+;;;   Copyright (c) 2015-2016  Takashi Kato  <ktakashi@ymail.com>
 ;;;   
 ;;;   Redistribution and use in source and binary forms, with or without
 ;;;   modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@
 (library (plato webapp postit)
     (export entry-point support-methods mount-paths)
     (import (rnrs) 
+	    (rnrs eval)
 	    (paella)
 	    (tapas)
 	    (plato)
@@ -52,10 +53,12 @@
   (define style-loader (cuberteria-resource-loader 'text/css "./css"))
   (define png-loader (cuberteria-resource-loader 'image/png "./images"))
   
-  ;; TODO make it generic
+  (define postit-generator
+    (let-values (((driver op alist) (dbi-parse-dsn +dsn+)))
+      (eval 'generator (environment `(postit ,(string->symbol driver))))))
+
   (define-class <entity> ()
-    ((id :init-keyword :id :primary-key #t 
-	 :generator (maquette-generator "TODO")))
+    ((id :init-keyword :id :primary-key #t :generator postit-generator))
     :metaclass <maquette-table-meta>)
 
   (define (timestamp->millisecond t)
@@ -91,8 +94,10 @@
 	   :->json cuberteria-object->json)
      (postit :init-keyword :postit :sql-type 'clob
 	     :json-element-name "note")
-     (x :init-keyword :x :sql-type 'integer :default 0)
-     (y :init-keyword :y :sql-type 'integer :default 0)
+     (top :init-keyword :top :sql-type 'integer :default 0
+	  :column-name "x")
+     (left :init-keyword :left :sql-type 'integer :default 0
+	   :column-name "y")
      (width :init-keyword :width :sql-type 'integer :default 300)
      (height :init-keyword :height :sql-type 'integer :default 300)
      (text-color :init-keyword :text-color :foreign-key (list <color> 'id)
@@ -133,34 +138,24 @@
      (text-color-id :converter utf8->integer)
      (bg-color-id :converter utf8->integer)))
 
-  (define-constant +sql:insert-postit+
-    "insert into postit \
-       (userid, postit, text_color_id, bg_color_id) \
-     select u.id, ?, ?, ? \
-     from users u where username = ?")
-    
   (define (create-postit req) 
     (define request (cuberteria-map-http-request! (make <create-request>) req))
 
     (parameterize ((current-directory 
 		    (plato-current-path 
 		     (plato-parent-context (*plato-current-context*)))))
-      (define conn (dbi-connect +dsn+))
-      (let ((q (dbi-prepare conn +sql:insert-postit+)))
-	(dbi-bind-parameter! q 4 (slot-ref request 'username))
-	(dbi-bind-parameter! q 1 (slot-ref request 'note))
-	;; FIXME maybe we should lookup color name here
-	(if (slot-bound? request 'text-color-id)
-	    (dbi-bind-parameter! q 2 (slot-ref request 'text-color-id))
-	    (dbi-bind-parameter! q 2 1)) ;; black
-	(if (slot-bound? request 'bg-color-id)
-	    (dbi-bind-parameter! q 3 (slot-ref request 'bg-color-id))
-	    (dbi-bind-parameter! q 3 0)) ;; white
-	(dbi-execute! q)
-	(dbi-commit! q)
-	(dbi-close q))
-      (dbi-close conn)
-      (values 200 'text/plan "OK")))
+      (let ((text-color (make <color> :id (slot-ref request 'text-color-id)))
+	    (bg-color (make <color> :id (slot-ref request 'bg-color-id)))
+	    (user (car (maquette-query maquette-context <user>
+			       `(= username ,(slot-ref request 'username))))))
+	(with-maquette-transaction maquette-context
+	  (maquette-save maquette-context
+			 (make <postit>
+			   :user user
+			   :text-color text-color
+			   :bg-color bg-color
+			   :postit (slot-ref request 'note))))
+      (values 200 'text/plan "OK"))))
 
   (define-class <id-request> (<converter-mixin>)
     ((id   :converter utf8->integer)))
@@ -172,8 +167,6 @@
     (format out "#<position-update-request id=~s top=~s left=~s>"
 	    (slot-ref o 'id) (slot-ref o 'top) (slot-ref o 'left)))
 
-  (define-constant +sql:position-update+
-    "update postit set x = ?, y = ? where id = ?")
   (define (update-position req) 
     (define request (cuberteria-map-http-request! 
 		     (make <position-update-request>) req))
@@ -181,15 +174,12 @@
     (parameterize ((current-directory 
 		    (plato-current-path 
 		     (plato-parent-context (*plato-current-context*)))))
-      (define conn (dbi-connect +dsn+))
-      (let ((q (dbi-prepare conn +sql:position-update+)))
-	(dbi-bind-parameter! q 1 (slot-ref request 'top))
-	(dbi-bind-parameter! q 2 (slot-ref request 'left))
-	(dbi-bind-parameter! q 3 (slot-ref request 'id))
-	(dbi-execute! q)
-	(dbi-commit! q)
-	(dbi-close q))
-      (dbi-close conn)
+      (with-maquette-transaction maquette-context
+        (maquette-save maquette-context
+		       (make <postit>
+			 :id (slot-ref request 'id)
+			 :top (slot-ref request 'top)
+			 :left (slot-ref request 'left))))
       (values 200 'text/plan "OK")))
 
   (define-class <size-update-request> (<id-request> <converter-mixin>)
@@ -199,8 +189,6 @@
     (format out "#<size-update-request id=~s width=~s height=~s>"
 	    (slot-ref o 'id) (slot-ref o 'width) (slot-ref o 'height)))
 
-  (define-constant +sql:size-update+
-    "update postit set width = ?, height = ? where id = ?")
   (define (update-size req) 
     (define request (cuberteria-map-http-request! 
 		     (make <size-update-request>) req))
@@ -208,15 +196,12 @@
     (parameterize ((current-directory 
 		    (plato-current-path 
 		     (plato-parent-context (*plato-current-context*)))))
-      (define conn (dbi-connect +dsn+))
-      (let ((q (dbi-prepare conn +sql:size-update+)))
-	(dbi-bind-parameter! q 1 (slot-ref request 'width))
-	(dbi-bind-parameter! q 2 (slot-ref request 'height))
-	(dbi-bind-parameter! q 3 (slot-ref request 'id))
-	(dbi-execute! q)
-	(dbi-commit! q)
-	(dbi-close q))
-      (dbi-close conn)
+      (with-maquette-transaction maquette-context
+        (maquette-save maquette-context
+		       (make <postit>
+			 :id (slot-ref request 'id)
+			 :width (slot-ref request 'width)
+			 :height (slot-ref request 'height))))
       (values 200 'text/plan "OK")))
 
   (define-constant +sql:delete+ "delete from postit where id = ?")
@@ -226,13 +211,10 @@
     (parameterize ((current-directory 
 		    (plato-current-path 
 		     (plato-parent-context (*plato-current-context*)))))
-      (define conn (dbi-connect +dsn+))
-      (let ((q (dbi-prepare conn +sql:delete+)))
-	(dbi-bind-parameter! q 1 (slot-ref request 'id))
-	(dbi-execute! q)
-	(dbi-commit! q)
-	(dbi-close q))
-      (dbi-close conn)
+      (with-maquette-transaction maquette-context
+        (maquette-remove maquette-context
+			 (make <postit>
+			   :id (slot-ref request 'id))))
       (values 200 'text/plan "OK")))
 
   (define-constant +sql:colors+ "select id, rgb, color_name from colors")
@@ -241,21 +223,15 @@
 		    (plato-current-path 
 		     (plato-parent-context (*plato-current-context*))))
 		   (*json-map-type* 'alist))
-      (define conn (dbi-connect +dsn+))
       (define (json->string json)
 	(call-with-string-output-port
 	 (lambda (out)
 	   (json-write json out))))
-      (let* ((q (dbi-execute-query-using-connection! conn +sql:colors+))
-	     (colors (dbi-query-map q
-		      (match-lambda
-		       (#(id rgb name)
-			`((id  . ,id)
-			  (rgb . ,rgb)
-			  (name . ,name)))))))
-	(dbi-close conn)
-	(values 200 'application/json 
-		(json->string (list->vector colors))))))
+
+      (values 200 'application/json
+	      (json->string (list->vector (map cuberteria-object->json
+					       (maquette-query maquette-context
+							       <color> #f)))))))
 
   (define (mount-paths)
     `( 
