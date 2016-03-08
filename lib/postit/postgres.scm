@@ -1,8 +1,8 @@
 ;;; -*- mode:scheme; coding:utf-8; -*-
 ;;;
-;;; dsn.dat - Data Souce Name file
+;;; postit/postgres - Id generator for PostgreSQL
 ;;;  
-;;;   Copyright (c) 2015-2016  Takashi Kato  <ktakashi@ymail.com>
+;;;   Copyright (c) 2016  Takashi Kato  <ktakashi@ymail.com>
 ;;;   
 ;;;   Redistribution and use in source and binary forms, with or without
 ;;;   modification, are permitted provided that the following conditions
@@ -28,7 +28,27 @@
 ;;;   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;;  
 
-;; this file is included by include syntax so mere string is fine.
-;; modify this if you want to use other RDBMS
-;;"dbi:sqlite3:database=../../postit.db"
-"dbi:postgres:host=localhost;database=postit"
+(library (postit postgres)
+    (export generator)
+    (import (rnrs)
+	    (sagittarius)
+	    (maquette query)
+	    (maquette connection)
+	    (maquette tables)
+	    (clos core)
+	    (dbi))
+
+;; PostgreSQL uses sequence to generate id
+;; the name must be `table_name`_seq
+(define (generator object conn)
+  (let ((seq (format "~a_seq" (maquette-table-name (class-of object))))
+	(dbi-conn (maquette-connection-dbi-connection conn)))
+    (let ((q (dbi-execute-query-using-connection! dbi-conn
+		(format "select nextval('~a')" seq))))
+      (let ((r (vector-ref (dbi-fetch! q) 0)))
+	(dbi-close q)
+	r))))
+  
+
+)
+

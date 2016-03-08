@@ -48,6 +48,7 @@
 	    (clos user))
 
   (define-constant +dsn+ (include "dsn.dat"))
+  (define-constant +auth+ (include "passwd"))
 
   (define script-loader (cuberteria-resource-loader 'text/javascript "./js"))
   (define style-loader (cuberteria-resource-loader 'text/css "./css"))
@@ -111,7 +112,8 @@
     :metaclass <maquette-table-meta>)
 
   ;; should we have this here?
-  (define maquette-context (make-maquette-context +dsn+ :auto-commit #f))
+  (define maquette-context 
+    (apply make-maquette-context +dsn+ :auto-commit #f +auth+))
 
   ;; TODO should we pool connections?
   (define (postit-loader req)
@@ -124,9 +126,8 @@
 	 (lambda (out)
 	   (json-write json out))))
       
-      (define user-template (make <user> :id 0))
-      (let ((r (maquette-query maquette-context <postit> 
-			       #f)))
+      (define anon (make <user> :id 0))
+      (let ((r (maquette-query maquette-context <postit> `(= user ,anon))))
 	(values 200 'application/json
 		(json->string (list->vector 
 			       (map cuberteria-object->json r)))))))
