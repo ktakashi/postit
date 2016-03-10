@@ -15,6 +15,10 @@
   </style>
   <script type="text/javascript">
     <!--
+	var color_data;
+	var dialog;
+	var username = "anonymous"; // for now
+
 	function save_position(event, ui) {
 	  // ajax.get (ui.id, ui.position.top, ui.position.left)
 	  var id = $(this).attr('id');
@@ -47,26 +51,101 @@
 	  for (var i = 0; i < remain; i++) hex = '0' + hex;
 	  return "#" + hex;
 	}
-	function load_colors(id) {
-	  jQuery.ajax("/postit/colors", {
-	    success: function(data, status, jqXHR) {
-	      var colors = $("#" + id);
-	      colors.empty();
-	      for (var i = 0; i < data.length; i++) {
-	        var option = jQuery("<option>", {
-		  "value": data[i].id,
-		  "style": "background-color:" + decimal_to_rgbhex(data[i].rgb)
-		}).append(data[i].name);
-		colors.append(option);
-	      }
-	      colors.on("change", function(event) {
-	        var rgb_id = $(this).val();
-	        $(this).css("background-color", decimal_to_rgbhex(data[rgb_id].rgb));
-	      });
-	    }
+	function load_colors(id, init) {
+	  var colors = $("#" + id);
+	  var data = color_data;
+	  colors.empty();
+	  colors.on("change", function(event) {
+	    var rgb_id = $(this).val();
+	    $(this).css("background-color", decimal_to_rgbhex(data[rgb_id].rgb));
 	  });
+	  for (var i = 0; i < data.length; i++) {
+	    var option = jQuery("<option>", {
+	  	  "value": data[i].id,
+	  	  "style": "background-color:" + decimal_to_rgbhex(data[i].rgb)
+	  	}).append(data[i].name);
+	  	if (data[i].name == init) option.attr('selected', 'selected');
+	  	colors.append(option);
+	  }
 	}
-	function load_postit() {
+	function paste_postit(area, data) {
+	  var style = "top:" + data.top + "px;";
+	  style += "left:" + data.left + "px;";
+	  style += "width:" + data.width + "px;";
+	  style += "height:" + data.height + "px;";
+	  style += "background-color:" + decimal_to_rgbhex(data.backgroundColor) + ";";
+
+	  // remove if exists
+	  $("#" + data.id).remove();
+
+	  var d = new Date(data.creationDate);
+	  var date = jQuery("<div/>", {
+	    "style": "bottom: 0px; position: absolute;"
+	  }).append("Created on: ")
+	    .append(d.toLocaleDateString())
+	    .append(" ")
+	    .append(d.toLocaleTimeString());
+	  var close = jQuery("<a>", {
+	    "href": "javascript:void(0)",
+	    "class": "ui-icon ui-icon-circle-close",
+	    "style": "position: absolute; top: 0px; right:0px",
+	    "postit": data.id,
+	  }).on("click", remove_postit);
+	  var note = jQuery("<div>", {
+	    "style": "color:" + decimal_to_rgbhex(data.textColor) + ";"
+	  }).append(data.note);
+	        
+	  var div = jQuery("<div/>", {
+	    "id":      data.id,
+	    "class":   "draggable",
+	    "style":   style
+	  }).append(note)
+	    .append(close)
+	    .append(date)
+	    .on("click", function(event) {
+	      $(".draggable").css({"z-index": 10});
+	      $(this).css({"z-index": 100});
+	  }).appendTo(area);
+
+	  // add draggable
+	  div.draggable({
+            stop: save_position,
+	    containment: "parent"
+	  }).resizable({
+	    stop: save_size,
+	  });
+	  // add double click
+	  div.dblclick(function () {
+	    set_dialog_value(dialog, data.id, data.note, data.textColor, data.backgroundColor);
+	    dialog.dialog("open");
+	  });
+	  return div;
+	}
+
+	function find_color(name, id) {
+	  var o = $(name = " option[value=" + id + "]");
+	  if (o) return o;
+	  // id must be a name
+	  for (var i = 0; i < color_data.length; i++) {
+	    var c = color_data[i];
+	    if (c.name = id) {
+	      return $(name = " option[value=" + c.rgb + "]");
+	    }
+	  }
+	}
+	function set_dialog_value(dialog, id, note, tc, bc) {
+	  if (id) {
+	    $("#note_id").val(id);
+	    $("#note_id").removeAttr('disabled');
+	  } else {
+	    $("#note_id").attr('disabled', 'disabled');
+	  }
+
+	  $("#note").val(note);
+	  find_color("#text-colors", tc).attr('selected', 'selected');
+	  find_color("#bg-colors", bc).attr('selected', 'selected');
+	}
+	function load_postits() {
 	  jQuery.ajax("/postit/load-postit", {
 	    success: function(data, status, jqXHR) {
 	      // datum must have the followings
@@ -76,68 +155,40 @@
 	      area.empty();
 
 	      for (var i = 0; i < data.length; i++) {
-	        var style = "top:" + data[i].top + "px;";
-		style += "left:" + data[i].left + "px;";
-		style += "width:" + data[i].width + "px;";
-		style += "height:" + data[i].height + "px;";
-		style += "background-color:" + decimal_to_rgbhex(data[i].backgroundColor) + ";";
-
-		var d = new Date(data[i].creationDate);
-		var date = jQuery("<div/>", {
-		  "style": "bottom: 0px; position: absolute;"
-		}).append("Created on: ")
-		  .append(d.toLocaleDateString())
-		  .append(" ")
-		  .append(d.toLocaleTimeString());
-		var close = jQuery("<a>", {
-		  "href": "javascript:void(0)",
-		  "class": "ui-icon ui-icon-circle-close",
-		  "style": "position: absolute; top: 0px; right:0px",
-		  "postit": data[i].id,
-		}).on("click", remove_postit);
-		var note = jQuery("<div>", {
-		  "style": "color:" + decimal_to_rgbhex(data[i].textColor) + ";"
-		}).append(data[i].note);
-		      
-	        var div = jQuery("<div/>", {
-		  "id":      data[i].id,
-		  "class":   "draggable",
-		  "style":   style
-		}).append(note)
-		  .append(close)
-		  .append(date)
-		  .on("click", function(event) {
-		    $(".draggable").css({"z-index": 10});
-		    $(this).css({"z-index": 100});
-		  })
-		  .appendTo(area);
+	        paste_postit(area, data[i]);
 	      }
-	      
-	      $(".draggable").draggable({
-                stop: save_position,
-		containment: "parent"
-	      }).resizable({
-	        stop: save_size,
-	      }); 
 	    }
 	  });
 	}
 
 	$(function() {
-	  var dialog, form;
+	  var form;
 	  function postit() {
 	    var note = $("#note").val();
-	    var username = "anonymous"; // for now
 	    var tc = $("#text-colors").val();
 	    var bg = $("#bg-colors").val();
+	    var note_id = $("#note_id");
+	    var data;
+	    if (note_id.attr('disabled')) {
+	      data = { "note": note, 
+		       "username" : username, 
+		       "text-color-id": tc,
+		       "bg-color-id": bg };
+	    } else {
+	      data = { "id" : note_id.val(),
+		       "note": note, 
+		       "username" : username, 
+		       "text-color-id": tc,
+		       "bg-color-id": bg };
+	    }
 
 	    jQuery.ajax("/postit/create-postit", {
 	      type: "POST",
-	      data: { "note": note, 
-		      "username" : username, 
-		      "text-color-id": tc,
-		      "bg-color-id": bg},
-	      success: load_postit // argument will be ignored
+	      data: data,
+	      success: function (data, status, jqXHR) {
+	        var area = $("#postits");
+		paste_postit(area, data);
+	      }
 	    });
 	    dialog.dialog("close");
 	  }
@@ -158,11 +209,19 @@
 	    postit();
 	  });
 	  $("#new-postit").button().on("click", function() {
+	    set_dialog_value(dialog, false, "", "black", "white");
 	    dialog.dialog("open");
 	  });
-	  load_postit();
-	  load_colors("text-colors");
-	  load_colors("bg-colors");
+	  jQuery.ajax("/postit/colors", {
+	    success: function(data, status, jqXHR) {
+	      color_data = data;
+	    },
+	    async: false
+	  });
+
+	  load_postits();
+	  load_colors("text-colors", "black");
+	  load_colors("bg-colors", "white");
 	});
       -->
   </script>
@@ -175,6 +234,7 @@
 	  <div style="width: 100%; position: relative;">
 	    <div class="note" style="float:left; width: 70%;">
 	      <label for="note">Note</label>
+	      <input type="hidden" name="id" id="note_id"/>
 	      <textarea id="note" name="note"
 		        class="text" cols="30" rows="10"></textarea>
 	      <input type="submit" tabindex="-1" class="postit"

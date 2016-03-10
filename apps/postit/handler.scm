@@ -99,8 +99,10 @@
 	  :column-name "x")
      (left :init-keyword :left :sql-type 'integer :default 0
 	   :column-name "y")
-     (width :init-keyword :width :sql-type 'integer :default 300)
-     (height :init-keyword :height :sql-type 'integer :default 300)
+     (width :init-keyword :width :sql-type 'integer :default 300
+	    :init-value 300)
+     (height :init-keyword :height :sql-type 'integer :default 300
+	     :init-value 300)
      (text-color :init-keyword :text-color :foreign-key (list <color> 'id)
 		 :column-name "text_color_id"
 		 :json-element-name "textColor"
@@ -115,17 +117,17 @@
   (define maquette-context 
     (apply make-maquette-context +dsn+ :auto-commit #f +auth+))
 
+  (define (json->string json)
+    (call-with-string-output-port
+     (lambda (out)
+       (json-write json out))))
+
   ;; TODO should we pool connections?
   (define (postit-loader req)
     (parameterize ((current-directory 
 		    (plato-current-path 
 		     (plato-parent-context (*plato-current-context*))))
-		   (*json-map-type* 'alist))
-      (define (json->string json)
-	(call-with-string-output-port
-	 (lambda (out)
-	   (json-write json out))))
-      
+		   (*json-map-type* 'alist))      
       (define anon (make <user> :id 0))
       (let ((r (maquette-query maquette-context <postit> `(= user ,anon))))
 	(values 200 'application/json
@@ -133,30 +135,45 @@
 			       (map cuberteria-object->json r)))))))
 
   (define (utf8->integer bv) (string->number (utf8->string bv)))
+  ;; this now does update as well.
   (define-class <create-request> (<converter-mixin>)
-    ((username :converter utf8->string)
+    ((id       :converter utf8->integer)
+     (username :converter utf8->string)
      (note     :converter utf8->string)
      (text-color-id :converter utf8->integer)
      (bg-color-id :converter utf8->integer)))
 
   (define (create-postit req) 
     (define request (cuberteria-map-http-request! (make <create-request>) req))
+    (define (get-colors request)
+      (let* ((tid (slot-ref request 'text-color-id))
+	     (bid (slot-ref request 'bg-color-id))
+	     (colors (maquette-query maquette-context <color>
+				     `(in id ,tid ,bid))))
+	;; TODO should we trust users input?
+	;; don't trust the order
+	(if (= tid (slot-ref (car colors) 'id))
+	    (values (car colors) (cadr colors))
+	    (values (cadr colors) (car colors)))))
 
     (parameterize ((current-directory 
 		    (plato-current-path 
-		     (plato-parent-context (*plato-current-context*)))))
-      (let ((text-color (make <color> :id (slot-ref request 'text-color-id)))
-	    (bg-color (make <color> :id (slot-ref request 'bg-color-id)))
-	    (user (car (maquette-query maquette-context <user>
-			       `(= username ,(slot-ref request 'username))))))
-	(with-maquette-transaction maquette-context
-	  (maquette-save maquette-context
-			 (make <postit>
-			   :user user
-			   :text-color text-color
-			   :bg-color bg-color
-			   :postit (slot-ref request 'note))))
-      (values 200 'text/plan "OK"))))
+		     (plato-parent-context (*plato-current-context*))))
+		   (*json-map-type* 'alist))
+      (let-values (((text-color bg-color) (get-colors request)))
+	(let* ((user (car (maquette-query maquette-context <user>
+			    `(= username ,(slot-ref request 'username)))))
+	       (r (make <postit>
+		    :user user
+		    :text-color text-color
+		    :bg-color bg-color
+		    :postit (slot-ref request 'note))))
+	  (when (slot-bound? request 'id)
+	    (slot-set! r 'id (slot-ref request 'id)))
+	  (with-maquette-transaction maquette-context
+	    (maquette-save maquette-context r))
+	  (values 200 'application/json 
+		  (json->string (cuberteria-object->json r)))))))
 
   (define-class <id-request> (<converter-mixin>)
     ((id   :converter utf8->integer)))
@@ -171,7 +188,8 @@
   (define (update-position req) 
     (define request (cuberteria-map-http-request! 
 		     (make <position-update-request>) req))
-
+    (define top (slot-ref request 'top))
+    (define left (slot-ref request 'left))
     (parameterize ((current-directory 
 		    (plato-current-path 
 		     (plato-parent-context (*plato-current-context*)))))
@@ -179,8 +197,8 @@
         (maquette-save maquette-context
 		       (make <postit>
 			 :id (slot-ref request 'id)
-			 :top (slot-ref request 'top)
-			 :left (slot-ref request 'left))))
+			 :top top
+			 :left left)))
       (values 200 'text/plan "OK")))
 
   (define-class <size-update-request> (<id-request> <converter-mixin>)
@@ -224,11 +242,6 @@
 		    (plato-current-path 
 		     (plato-parent-context (*plato-current-context*))))
 		   (*json-map-type* 'alist))
-      (define (json->string json)
-	(call-with-string-output-port
-	 (lambda (out)
-	   (json-write json out))))
-
       (values 200 'application/json
 	      (json->string (list->vector (map cuberteria-object->json
 					       (maquette-query maquette-context
