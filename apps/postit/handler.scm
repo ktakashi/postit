@@ -173,7 +173,10 @@
 	  (with-maquette-transaction maquette-context
 	    (maquette-save maquette-context r))
 	  (values 200 'application/json 
-		  (json->string (cuberteria-object->json r)))))))
+		  (json->string 
+		   (cuberteria-object->json
+		    (car (maquette-query maquette-context <postit>
+					 `(= id ,(slot-ref r 'id)))))))))))
 
   (define-class <id-request> (<converter-mixin>)
     ((id   :converter utf8->integer)))

@@ -30,5 +30,5 @@
 
 ;; this file is included by include syntax so mere string is fine.
 ;; modify this if you want to use other RDBMS
-"dbi:sqlite3:database=../../postit.db"
-;;"dbi:postgres:host=localhost;database=postit"
+;;"dbi:sqlite3:database=../../postit.db"
+"dbi:postgres:host=localhost;database=postit"
