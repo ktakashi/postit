@@ -1,0 +1,12 @@
+<md-dialog layout-padding>
+  <h2>Create</h2>
+  <form name="postForm" action="get">
+    <md-input-container>
+      <label>Note</label>
+      <textarea name="note" ng-model="note" required></textarea>
+      <md-button class="md-primary md-raised" ng-click="create()">
+	Create
+      </md-button>
+    </md-input-container>
+  </form>
+</md-dialog>

@@ -51,6 +51,7 @@
   (define script-loader (cuberteria-resource-loader 'text/javascript "./js"))
   (define style-loader (cuberteria-resource-loader 'text/css "./css"))
   (define png-loader (cuberteria-resource-loader 'image/png "./images"))
+  (define template-loader (cuberteria-resource-loader 'text/html "./tmpl"))
 
   ;; should we have this here?
   (define maquette-context 
@@ -127,6 +128,7 @@
       ((GET)  #/scripts/ ,script-loader)
       ((GET)  #/styles/  ,style-loader)
       ((GET)  #/styles\/images\/.+?\.png/  ,png-loader)
+      ((GET)  #/templates/  ,template-loader)
       ((GET)  "/load-postit" ,(plato-session-handler postit-loader))
       ((POST) "/create-postit" ,(plato-session-handler create-postit))
       ((POST) "/remove-postit" ,(plato-session-handler remove-postit))

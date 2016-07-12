@@ -14,57 +14,83 @@
   <!-- Angular Material Library -->
   <script src="http://ajax.googleapis.com/ajax/libs/angular_material/1.1.0-rc4/angular-material.min.js"></script>
   <style>
-    body, html { height: 100%; }
-    .draggable { width: 150px; height: 150px; padding: 0.5em; border: 1px solid}
-    fieldset { padding:0; border:0; margin-top:25px; }
-    div.note label, input { display:block; }
-    div.face label, select { display:inline; }
+body, html { height: 100%; }
+.draggable { width: 150px; height: 150px; padding: 0.5em; border: 1px solid}
+
   </style>
 </head>
 <body>
-  <div id="control" style="float: left; width: 10%;">
-    <div id="postits" style="float: right; width: 90%; height: 100%;">
-      <div ng-app="posts" ng-controller="postsCtrl" ng-cloak>
-	<div ng-repeat="post in posts" class="draggable">
+  <div id="control">
+    <div ng-app="posts" id="postits">
+      <div ng-controller="dialogCtrl" class="md-padding" ng-cloak>
+	<md-button class="md-primary md-raised" ng-click="showDialog($event)">
+	  Create
+	</md-button>
+      </div>
+      
+      <div ng-controller="postsCtrl" ng-cloak>
+	<div ng-repeat="post in posts" class="draggable" onload="load()">
 	  <div>State {{post.state.name}}</div>
 	  <div>{{post.note}}</div>
 	  <div>Created by {{post.user.username}}</div>
 	  <div>Created at {{post.creationDate | date:'medium'}}</div>
 	</div>
       </div>
+      
     </div>
-    
-    <div id="dialog" title="New">
-      <form action="#">
-	<fieldset>
-	  <div style="width: 100%; position: relative;">
-	    <div class="note" style="float:left; width: 70%;">
-	      <label for="note">Note</label>
-	      <input type="hidden" name="id" id="note_id"/>
-	      <textarea id="note" name="note"
-		        class="text" cols="30" rows="10"></textarea>
-	      <input type="submit" tabindex="-1" class="postit"
-		     style="position:absolute; top:-1000px">
-	    </div>
-	  </div>
-	</fieldset>
-      </form>
-    </div>
-    <button id="new-postit">Create</button>
   </div>
   <script><!--
-angular.module('posts', ['ngMaterial', 'ngMessages'])
-  .controller('postsCtrl', function($scope, $http) {
+var posts = angular.module('posts', ['ngMaterial', 'ngMessages']);
+posts.controller('postsCtrl', function($scope, $http, $rootScope) {
+  // maybe we just want to append the result.
+  $rootScope.$on("reload", function() {
+    $scope.load();
+  });
+  $scope.load = function() {
     $http.get("/postit/load-postit")
          .then(
             function(response) {
-	      $scope.posts = response.data;
-	    },
+              $scope.posts = response.data;
+            },
             function(response) {
-	      $scope.posts = [];
-	    }
-          )
+              $scope.posts = [];
+            });
+  };
+  $scope.load();// is there a better way?
 });
+
+posts.controller('dialogCtrl', function($scope, $mdDialog, $rootScope, $http) {
+
+  $scope.showDialog = function(ev) {
+    $mdDialog.show({
+      controller: DialogController,
+      templateUrl: '/postit/templates/post.tmpl.html',
+      parent: angular.element(document.body),
+      targetEvent: ev,
+      clickOutsideToClose: true
+    }).then(function(note) {
+      var data = "username=anonymous&note=" + encodeURIComponent(note);
+      $http({
+        method: 'POST',
+	url: "/postit/create-postit",
+	headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+	data: data
+      }).then(
+        function() {
+          $rootScope.$emit("reload", {});
+        }
+      );
+    });
+  };
+})
+
+function DialogController($scope, $mdDialog) {
+  $scope.hide = function() { $mdDialog.hide(); };
+  $scope.cancel = function() { $mdDialog.cancel(); };
+  $scope.create = function() {
+    $mdDialog.hide($scope.note); 
+  };
+}
 --></script>
 </body>
 </html>
