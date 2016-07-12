@@ -6,6 +6,13 @@
   <link rel="stylesheet" href="/postit/styles/jquery-ui.css">
   <script src="/postit/scripts/jquery.js"></script>
   <script src="/postit/scripts/jquery-ui.js"></script>
+  <link rel="stylesheet" href="http://ajax.googleapis.com/ajax/libs/angular_material/1.1.0-rc4/angular-material.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-animate.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-aria.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-messages.min.js"></script>
+  <!-- Angular Material Library -->
+  <script src="http://ajax.googleapis.com/ajax/libs/angular_material/1.1.0-rc4/angular-material.min.js"></script>
   <style>
     body, html { height: 100%; }
     .draggable { width: 150px; height: 150px; padding: 0.5em; border: 1px solid}
@@ -13,221 +20,20 @@
     div.note label, input { display:block; }
     div.face label, select { display:inline; }
   </style>
-  <script type="text/javascript">
-    <!--
-	var color_data;
-	var dialog;
-	var username = "anonymous"; // for now
-
-	function save_position(event, ui) {
-	  // ajax.get (ui.id, ui.position.top, ui.position.left)
-	  var id = $(this).attr('id');
-	  var p = ui.position;
-	  jQuery.ajax("/postit/update-position", {
-	    type: "POST",
-	    data: { "id": id, "top": p.top, "left": p.left},
-	  });	  
-	}
-	function save_size(event, ui) {
-	  // ajax.get (ui.id, ui.size.width, ui.size.height)
-	  var id = $(this).attr('id');
-	  var p = ui.size;
-	  jQuery.ajax("/postit/update-size", {
-	    type: "POST",
-	    data: { "id": id, "width": p.width, "height": p.height},
-	  });
-	}
-	function remove_postit(event) {
-	  var id = $(this).attr('postit');
-	  jQuery.ajax("/postit/remove-postit", {
-	    type: "POST",
-	    data: {"id": id},
-	  });
-	  $("#" + id).remove();
-	}
-	function decimal_to_rgbhex(i) {
-	  var hex = i.toString(16);
-	  var remain = 6-hex.length;
-	  for (var i = 0; i < remain; i++) hex = '0' + hex;
-	  return "#" + hex;
-	}
-	function load_colors(id, init) {
-	  var colors = $("#" + id);
-	  var data = color_data;
-	  colors.empty();
-	  colors.on("change", function(event) {
-	    var rgb_id = $(this).val();
-	    $(this).css("background-color", decimal_to_rgbhex(data[rgb_id].rgb));
-	  });
-	  for (var i = 0; i < data.length; i++) {
-	    var option = jQuery("<option>", {
-	  	  "value": data[i].id,
-	  	  "style": "background-color:" + decimal_to_rgbhex(data[i].rgb)
-	  	}).append(data[i].name);
-	  	if (data[i].name == init) option.attr('selected', 'selected');
-	  	colors.append(option);
-	  }
-	}
-	function paste_postit(area, data) {
-	  var style = "top:" + data.top + "px;";
-	  style += "left:" + data.left + "px;";
-	  style += "width:" + data.width + "px;";
-	  style += "height:" + data.height + "px;";
-	  style += "background-color:" + decimal_to_rgbhex(data.backgroundColor) + ";";
-
-	  // remove if exists
-	  $("#" + data.id).remove();
-
-	  var d = new Date(data.creationDate);
-	  var date = jQuery("<div/>", {
-	    "style": "bottom: 0px; position: absolute;"
-	  }).append("Created on: ")
-	    .append(d.toLocaleDateString())
-	    .append(" ")
-	    .append(d.toLocaleTimeString());
-	  var close = jQuery("<a>", {
-	    "href": "javascript:void(0)",
-	    "class": "ui-icon ui-icon-circle-close",
-	    "style": "position: absolute; top: 0px; right:0px",
-	    "postit": data.id,
-	  }).on("click", remove_postit);
-	  var note = jQuery("<div>", {
-	    "style": "color:" + decimal_to_rgbhex(data.textColor) + ";"
-	  }).append(data.note);
-	        
-	  var div = jQuery("<div/>", {
-	    "id":      data.id,
-	    "class":   "draggable",
-	    "style":   style
-	  }).append(note)
-	    .append(close)
-	    .append(date)
-	    .on("click", function(event) {
-	      $(".draggable").css({"z-index": 10});
-	      $(this).css({"z-index": 100});
-	  }).appendTo(area);
-
-	  // add draggable
-	  div.draggable({
-            stop: save_position,
-	    containment: "parent"
-	  }).resizable({
-	    stop: save_size,
-	  });
-	  // add double click
-	  div.dblclick(function () {
-	    set_dialog_value(dialog, data.id, data.note, data.textColor, data.backgroundColor);
-	    dialog.dialog("open");
-	  });
-	  return div;
-	}
-
-	function find_color(name, id) {
-	  var o = $(name = " option[value=" + id + "]");
-	  if (o) return o;
-	  // id must be a name
-	  for (var i = 0; i < color_data.length; i++) {
-	    var c = color_data[i];
-	    if (c.name = id) {
-	      return $(name = " option[value=" + c.rgb + "]");
-	    }
-	  }
-	}
-	function set_dialog_value(dialog, id, note, tc, bc) {
-	  if (id) {
-	    $("#note_id").val(id);
-	    $("#note_id").removeAttr('disabled');
-	  } else {
-	    $("#note_id").attr('disabled', 'disabled');
-	  }
-
-	  $("#note").val(note);
-	  find_color("#text-colors", tc).attr('selected', 'selected');
-	  find_color("#bg-colors", bc).attr('selected', 'selected');
-	}
-	function load_postits() {
-	  jQuery.ajax("/postit/load-postit", {
-	    success: function(data, status, jqXHR) {
-	      // datum must have the followings
-	      // id, note, top, left, width, height, 
-	      // text-color, background-color, creation-date
-	      var area = $("#postits");
-	      area.empty();
-
-	      for (var i = 0; i < data.length; i++) {
-	        paste_postit(area, data[i]);
-	      }
-	    }
-	  });
-	}
-
-	$(function() {
-	  var form;
-	  function postit() {
-	    var note = $("#note").val();
-	    var tc = $("#text-colors").val();
-	    var bg = $("#bg-colors").val();
-	    var note_id = $("#note_id");
-	    var data;
-	    if (note_id.attr('disabled')) {
-	      data = { "note": note, 
-		       "username" : username, 
-		       "text-color-id": tc,
-		       "bg-color-id": bg };
-	    } else {
-	      data = { "id" : note_id.val(),
-		       "note": note, 
-		       "username" : username, 
-		       "text-color-id": tc,
-		       "bg-color-id": bg };
-	    }
-
-	    jQuery.ajax("/postit/create-postit", {
-	      type: "POST",
-	      data: data,
-	      success: function (data, status, jqXHR) {
-	        var area = $("#postits");
-		paste_postit(area, data);
-	      }
-	    });
-	    dialog.dialog("close");
-	  }
-	  dialog = $("#dialog").dialog({
-	    autoOpen: false,
-	    height: 500,
-	    width: 550,
-	    modal: true,
-	    buttons: {
-	      "Post It": postit,
-	      Cancel: function() { dialog.dialog("close"); }
-	    },
-	    close: function() { form[0].reset(); }
-	  });
-	  
-	  form = dialog.find("form").on("submit", function(event) {
-	    event.preventDefault();
-	    postit();
-	  });
-	  $("#new-postit").button().on("click", function() {
-	    set_dialog_value(dialog, false, "", "black", "white");
-	    dialog.dialog("open");
-	  });
-	  jQuery.ajax("/postit/colors", {
-	    success: function(data, status, jqXHR) {
-	      color_data = data;
-	    },
-	    async: false
-	  });
-
-	  load_postits();
-	  load_colors("text-colors", "black");
-	  load_colors("bg-colors", "white");
-	});
-      -->
-  </script>
 </head>
 <body>
   <div id="control" style="float: left; width: 10%;">
+    <div id="postits" style="float: right; width: 90%; height: 100%;">
+      <div ng-app="posts" ng-controller="postsCtrl" ng-cloak>
+	<div ng-repeat="post in posts" class="draggable">
+	  <div>State {{post.state.name}}</div>
+	  <div>{{post.note}}</div>
+	  <div>Created by {{post.user.username}}</div>
+	  <div>Created at {{post.creationDate | date:'medium'}}</div>
+	</div>
+      </div>
+    </div>
+    
     <div id="dialog" title="New">
       <form action="#">
 	<fieldset>
@@ -240,23 +46,26 @@
 	      <input type="submit" tabindex="-1" class="postit"
 		     style="position:absolute; top:-1000px">
 	    </div>
-	    <div class="face" style="float:right; width: 30%;">
-	      <h3>Colors</h3>
-	      <label for="text-colors">Font</label>
-	      <select id="text-colors" name="text-colors"></select>
-	      <br />
-	      <label for="bg-colors">Bg</label>
-	      <select id="bg-colors" name="bg-colors"></select>
-	    </div>
 	  </div>
 	</fieldset>
       </form>
     </div>
     <button id="new-postit">Create</button>
   </div>
-
-  <div id="postits" style="float: right; width: 90%; height: 100%;">
-  </div>
+  <script><!--
+angular.module('posts', ['ngMaterial', 'ngMessages'])
+  .controller('postsCtrl', function($scope, $http) {
+    $http.get("/postit/load-postit")
+         .then(
+            function(response) {
+	      $scope.posts = response.data;
+	    },
+            function(response) {
+	      $scope.posts = [];
+	    }
+          )
+});
+--></script>
 </body>
 </html>
 

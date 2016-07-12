@@ -31,42 +31,55 @@
 (library (postit sqlite3)
     (export generator)
     (import (rnrs)
-	    (maquette)
-	    (maquette query)
+	    (rnrs mutable-pairs)
+	    (sagittarius)
+	    (maquette connection)
 	    (maquette tables)
+	    (dbi)
 	    (clos core)
-	    (clos user)
 	    (srfi :18))
 
-;; generator takes 2 argument object and maquette connection
-;; we can take table name from given object. the primary key
-;; of the table is autoincreament thus we can retrieve the
-;; current value from sqlite_sequence table. so all we need
-;; to do is add 1 to that value.
-;; NB: sqlite_sequence has name and seq column
-;;     name = table name
-;;     seq  = current number
-(define-class <sqlite_sequence> ()
-  ((name :sql-type 'varchar)
-   (seq :sql-type 'integer))
-  :metaclass <maquette-table-meta>)
+;; in our table model, we don't use autoincrement keyword for
+;; simplicity of SQL script. So what we do here is basically
+;; manual sequence management.
+(define-constant +table-lists+
+  "select tbl_name from sqlite_master where type = 'table'")
+(define-constant +max-id+ "select max(id) from ")
+(define (init-sequence conn)
+  (define table (make-eq-hashtable))
+  (define dbi-conn (maquette-connection-dbi-connection conn))
+  (define query (dbi-execute-query-using-connection! dbi-conn +table-lists+))
+  (dbi-do-fetch! (r query)
+    (let* ((n (string-downcase (vector-ref r 0)))
+	   (q (dbi-execute-query-using-connection!
+	       dbi-conn (string-append +max-id+ n))))
+      (let ((v (vector-ref (dbi-fetch! q) 0)))
+	(dbi-close q)
+	(hashtable-set! table (string->symbol n)
+			(cons (make-mutex) (if (null? v) 0 (+ v 1)))))))
+  (dbi-close query)
+  table)
+
+(define (symbol-downcase s)
+  (string->symbol (string-downcase (symbol->string s))))
 (define generator
-  (let ((mutex (make-mutex)))
+  (let ((mutex (make-mutex))
+	(sequence #f))
     (lambda (object conn)
-      ;; unfortunately we need global lock.
-      (mutex-lock! mutex)
-      (guard (e (else (mutex-unlock! mutex) (raise e)))
-	(let* ((table (symbol->string (maquette-table-name (class-of object))))
-	       (r (maquette-select conn <sqlite_sequence> `(= name ,table))))
-	  (when (null? r)
-	    ;; mis configuration
-	    (mutex-unlock! mutex)
-	    (assertion-violation 'sqlite-generator
-				 "sqlite_sequence doesn't contain the table"
-				 table))
-	  (let ((seq (slot-ref (car r) 'seq)))
-	    (mutex-unlock! mutex)
-	    (+ seq 1)))))))
+      (unless sequence
+	(mutex-lock! mutex)
+	(unless sequence
+	  (set! sequence (init-sequence conn)))
+	(mutex-unlock! mutex))
+      
+      (let* ((t (symbol-downcase (maquette-table-name (class-of object))))
+	       (p (hashtable-ref sequence t #f)))
+	  (unless p (assertion-violation 'sqlite3-generator "unknown table" t))
+	  (mutex-lock! (car p))
+	  (let ((r (cdr p)))
+	    (set-cdr! p (+ r 1))
+	    (mutex-unlock! (car p))
+	    r)))))
   
 
 )

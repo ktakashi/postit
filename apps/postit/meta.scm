@@ -1,8 +1,8 @@
 ;;; -*- mode:scheme; coding:utf-8; -*-
 ;;;
-;;; dsn.dat - Data Souce Name file
+;;; meta info for postit - Simple postit application
 ;;;  
-;;;   Copyright (c) 2015-2016  Takashi Kato  <ktakashi@ymail.com>
+;;;   Copyright (c) 2016  Takashi Kato  <ktakashi@ymail.com>
 ;;;   
 ;;;   Redistribution and use in source and binary forms, with or without
 ;;;   modification, are permitted provided that the following conditions
@@ -28,7 +28,7 @@
 ;;;   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;;  
 
-;; this file is included by include syntax so mere string is fine.
-;; modify this if you want to use other RDBMS
-"dbi:sqlite3:database=../../postit.db"
-;;"dbi:postgres:host=localhost;database=postit"
+(
+ (handler   "postit.scm")
+ (load-path "scheme")
+ )
