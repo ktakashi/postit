@@ -11,12 +11,22 @@
   <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-animate.min.js"></script>
   <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-aria.min.js"></script>
   <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-messages.min.js"></script>
+  <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-route.min.js"></script>
   <!-- Angular Material Library -->
   <script src="http://ajax.googleapis.com/ajax/libs/angular_material/1.1.0-rc4/angular-material.min.js"></script>
   <style>
 body, html { height: 100%; }
-.draggable { width: 150px; height: 150px; padding: 0.5em; border: 1px solid}
-
+.draggable {
+  width: 200px;
+  height: 200px;
+  padding: 0.5em;
+  border: 1px solid;
+  position: relative;
+}
+.New { background-color: #ceffee}
+.username { font-size: 10px; position: absolute; bottom: 11px}
+.timestamp { font-size: 10px; position: absolute; bottom: 0px; }
+.delete { display: block; position: absolute; right: 3px; }
   </style>
 </head>
 <body>
@@ -29,59 +39,73 @@ body, html { height: 100%; }
       </div>
       
       <div ng-controller="postsCtrl" ng-cloak>
-	<div ng-repeat="post in posts" class="draggable" onload="load()">
-	  <div>State {{post.state.name}}</div>
+	<div ng-repeat="post in posts" class="{{post.state.name}} draggable" onload="load()">
+	  <a class="delete"
+	     href="javascript:void(0)" ng-click="remove(post.id)">x</a>
 	  <div>{{post.note}}</div>
-	  <div>Created by {{post.user.username}}</div>
-	  <div>Created at {{post.creationDate | date:'medium'}}</div>
+	  <div class="username">Created by {{post.user.username}}</div>
+	  <div class="timestamp">Created at {{post.creationDate | date:'medium'}}</div>
 	</div>
       </div>
       
     </div>
   </div>
   <script><!--
-var posts = angular.module('posts', ['ngMaterial', 'ngMessages']);
+var posts = angular.module('posts', ['ngMaterial', 'ngMessages', 'ngRoute']);
 posts.controller('postsCtrl', function($scope, $http, $rootScope) {
-  // maybe we just want to append the result.
-  $rootScope.$on("reload", function() {
-    $scope.load();
-  });
-  $scope.load = function() {
-    $http.get("/postit/load-postit")
-         .then(
-            function(response) {
-              $scope.posts = response.data;
-            },
-            function(response) {
-              $scope.posts = [];
-            });
-  };
-  $scope.load();// is there a better way?
+    // maybe we just want to append the result.
+    $rootScope.$on("reload", function() {
+	$scope.load();
+    });
+    $scope.load = function() {
+	$http.get("/postit/load-postit")
+            .then(
+		function(response) {
+		    $scope.posts = response.data;
+		},
+		function(response) {
+		    $scope.posts = [];
+		});
+    };
+    $scope.remove = function(id) {
+	$http({
+	    method: "POST",
+	    url: "/postit/remove-postit",
+	    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+	    data: "id=" + id
+	}).then(
+	    function(response) {
+		$scope.load();
+	    },
+	    function(response) {
+	    });
+    };
+    $scope.load();// is there a better way?
 });
 
 posts.controller('dialogCtrl', function($scope, $mdDialog, $rootScope, $http) {
 
-  $scope.showDialog = function(ev) {
-    $mdDialog.show({
-      controller: DialogController,
-      templateUrl: '/postit/templates/post.tmpl.html',
-      parent: angular.element(document.body),
-      targetEvent: ev,
-      clickOutsideToClose: true
-    }).then(function(note) {
-      var data = "username=anonymous&note=" + encodeURIComponent(note);
-      $http({
-        method: 'POST',
-	url: "/postit/create-postit",
-	headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-	data: data
-      }).then(
-        function() {
-          $rootScope.$emit("reload", {});
-        }
-      );
-    });
-  };
+    $scope.showDialog = function(ev) {
+	$mdDialog.show({
+	    controller: DialogController,
+	    templateUrl: '/postit/templates/post.tmpl.html',
+	    parent: angular.element(document.body),
+	    targetEvent: ev,
+	    clickOutsideToClose: true
+	}).then(function(note) {
+	    var data = "username=anonymous&note=" + encodeURIComponent(note);
+	    $http({
+		method: 'POST',
+		url: "/postit/create-postit",
+		headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+		data: data
+	    }).then(
+		function() {
+		    $rootScope.$emit("reload", {});
+		}
+	    );
+	});
+    };
 })
 
 function DialogController($scope, $mdDialog) {

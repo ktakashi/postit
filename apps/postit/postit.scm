@@ -129,7 +129,7 @@
       ((GET)  #/styles/  ,style-loader)
       ((GET)  #/styles\/images\/.+?\.png/  ,png-loader)
       ((GET)  #/templates/  ,template-loader)
-      ((GET)  "/load-postit" ,(plato-session-handler postit-loader))
+      ((GET)  #/load-postit/ ,(plato-session-handler postit-loader))
       ((POST) "/create-postit" ,(plato-session-handler create-postit))
       ((POST) "/remove-postit" ,(plato-session-handler remove-postit))
       ))
