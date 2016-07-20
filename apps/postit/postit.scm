@@ -43,6 +43,7 @@
 	    (match)
 	    (postit entities)
 	    (postit constants)
+	    (postit handlers)
 	    (text json)
 	    (srfi :19)
 	    (srfi :39)
@@ -123,6 +124,39 @@
 			   :id (slot-ref request 'id))))
       (values 200 'text/plan "OK")))
 
+  (define-class <username&password> (<converter-mixin>)
+    ((username :converter utf8->string)
+     (password :converter utf8->string)))
+  (define (generate-authorisation-token username password timestamp)
+    "authorised!")
+  (define (authorise username password) #f)
+  
+  (define authorisation-handler
+    (plato-session-handler
+     (lambda (req)
+       (define +dashboard+ "/postit/dashboard")
+       (define (handle-anonymous)
+	 ;; just set dummy value, it's anonymous anyway
+	 (plato-session-set! (*plato-current-session*) :auth-token "anonymous")
+	 (values 302 'text/plain +dashboard+))
+       (define (handle-users request)
+	 (plato-session-set! (*plato-current-session*) :auth-token
+	   (generate-authorisation-token
+	    (slot-ref request 'username)
+	    (slot-ref request 'password)
+	    (plato-session-ref (*plato-current-session*) :created)))
+	 (values 302 'text/plain "/postit/dashboard"))
+       (define request
+	 (cuberteria-map-http-request! (make <username&password>) req))
+       (cond ((string=? (slot-ref request 'username) "anonymous")
+	      (handle-anonymous))
+	     ((authorise (slot-ref request 'username)
+			 (slot-ref request 'password))
+	      (handle-users request))
+	     (else
+	      ;; fallback to next handler
+	      (values 403 'text/plain "Username or password is invalid"))))))
+  
   (define (mount-paths)
     `( 
       ((GET)  #/scripts/ ,script-loader)
@@ -130,14 +164,31 @@
       ((GET)  #/styles\/images\/.+?\.png/  ,png-loader)
       ((GET)  #/templates/  ,template-loader)
       ((GET)  #/load-postit/ ,(plato-session-handler postit-loader))
-      ((POST) "/create-postit" ,(plato-session-handler create-postit))
-      ((POST) "/remove-postit" ,(plato-session-handler remove-postit))
+      ((POST) "/create-postit" ,(session-expired-redirect-handler
+				 "/postit/login" ;; TODO
+				 create-postit))
+      ((POST) "/remove-postit" ,(session-expired-redirect-handler
+				 "/postit/login" ;; TODO
+				 remove-postit))
+      ((GET)  "/dashboard" ,(session-expired-redirect-handler
+			     "/postit/login"
+			     (tapas-request-handler main-handler)))
+      ((POST) "/login" ,(redirect-handler authorisation-handler
+					  entry-point))
+      ((GET) "/login" ,entry-point)
       ))
   (define (support-methods) '(GET))
 
   (define (main-handler req)
-    (call-with-input-file "main.html" html->tapas-component))
+    (define root-path (plato-current-path (*plato-root-context*)))
+    (call-with-input-file (build-path root-path "main.html")
+      html->tapas-component))
+  
+  (define (login-handler req)
+    (define root-path (plato-current-path (*plato-root-context*)))
+    (call-with-input-file (build-path root-path "login.html")
+      html->tapas-component))
 
   (define entry-point
-    (tapas-request-handler main-handler))
+    (tapas-request-handler login-handler))
 )
