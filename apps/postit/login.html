@@ -5,10 +5,14 @@
   <title>login</title>
 </head>
 <body>
-  <form action="/postit/login" method="post">
-    <div>Username: <input type="text" name="username" /></div>
-    <div>Password: <input type="password" name="password" /></div>
-    <input type="submit" value="Login" />
-  </form>
+  <div>
+    <div id="error_message" />
+    <form action="/postit/login" method="post">
+      <div>Username: <input type="text" name="username" /></div>
+      <div>Password: <input type="password" name="password" /></div>
+      <input type="submit" value="Login" />
+    </form>
+    <a href="/postit/user">Sign up</a>
+  </div>
 </body>
 </html>

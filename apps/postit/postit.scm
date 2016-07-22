@@ -40,6 +40,9 @@
 	    (sagittarius)
 	    (sagittarius regex)
 	    (maquette)
+	    (maquette query)
+	    (maquette context)
+	    (maquette connection)
 	    (match)
 	    (postit entities)
 	    (postit constants)
@@ -124,6 +127,13 @@
      (password :converter utf8->string)))
 
   (define +dashboard+ "/postit/dashboard")
+
+  (define (retrieve-credential username)
+    (and-let* ((r (maquette-query maquette-context <user>
+				  `(= username ,username)))
+	       ( (not (null? r)) ))
+      (slot-ref (car r) 'password)))
+	  
   (define authorisation-handler
     (plato-session-handler
      (cuberteria-object-mapping-handler <username&password>
@@ -136,11 +146,43 @@
        (cond ((string=? (slot-ref request 'username) "anonymous")
 	      (handle-login req))
 	     ((authorise (slot-ref request 'username)
-			 (slot-ref request 'password))
+			 (slot-ref request 'password)
+			 (retrieve-credential (slot-ref request 'username)))
 	      (handle-login req))
 	     (else
-	      ;; fallback to next handler
-	      (values 403 'text/plain "Username or password is invalid")))))))
+	      (values 200 'shtml
+		      (tapas-render-component
+		       (populate-error-message
+			"Username or password is invalid"
+			(login-handler req))))))))))
+
+  (define (populate-error-message e component)
+    (define (error-message? c)
+      (and (is-a? c <tapas-component>)
+	   (equal? "error_message" (slot-ref c 'id))))
+    (let ((c (tapas-find-component error-message? component)))
+      ;; FIXME
+      (when c (tapas-add-components! c (format "~a" e)))
+      (tapas-render-component component)))
+
+  (define create-user-handler
+    (cuberteria-object-mapping-handler  <username&password>
+      (lambda (request raw-request)
+	(define username (slot-ref request 'username))
+	(define password (slot-ref request 'password))
+	
+	(let ((credential (create-credential username password)))
+	  (guard (e (else
+		     (values 200 'shtml
+			     (populate-error-message
+			      e (user-handler raw-request)))))
+	    (with-maquette-transaction maquette-context
+	      (maquette-add maquette-context 
+			    (make <user> :username username
+				  :password credential)))
+	    ;; this would redirect to login anyway
+	    (values 302 'text/plain +dashboard+))))))
+    
   
   (define (mount-paths)
     `( 
@@ -161,6 +203,8 @@
       ((POST) "/login" ,(redirect-handler authorisation-handler))
       ((GET) "/login" ,entry-point)
       ((GET POST) "/logout" ,(plato-session-handler logout-handler))
+      ((GET)  "/user" ,(tapas-request-handler user-handler))
+      ((POST) "/user" ,(redirect-handler create-user-handler))
       ))
   (define (support-methods) '(GET))
 
@@ -169,16 +213,16 @@
      (lambda (req)
        (plato-session-delete! (*plato-current-session*) :auth-token)
        (values 302 'text/plain +dashboard+))))
+
+  (define (static-handler file)
+    (lambda (req)
+      (define root-path (plato-current-path (*plato-root-context*)))
+      (call-with-input-file (build-path root-path file)
+	html->tapas-component)))
   
-  (define (main-handler req)
-    (define root-path (plato-current-path (*plato-root-context*)))
-    (call-with-input-file (build-path root-path "main.html")
-      html->tapas-component))
-  
-  (define (login-handler req)
-    (define root-path (plato-current-path (*plato-root-context*)))
-    (call-with-input-file (build-path root-path "login.html")
-      html->tapas-component))
+  (define main-handler (static-handler "main.html"))
+  (define login-handler (static-handler "login.html"))
+  (define user-handler (static-handler "user.html"))
   
   (define entry-point
     (let ((login (tapas-request-handler login-handler)))
