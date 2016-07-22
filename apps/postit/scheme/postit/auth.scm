@@ -99,8 +99,8 @@
       (hash-done! h bv)
       bv))
   (define (create-credential username password)
-    (let ((salt (read-sys-random (* (hash-size SHA-1) 8)))
-	  (h (%create-credential username password salt)))
+    (let* ((salt (read-sys-random (* (hash-size SHA-1) 8)))
+	   (h (%create-credential username password salt)))
       (format "~a~$~a$~a" +algorithm+ (compact salt) (compact h))))
     
 )
