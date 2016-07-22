@@ -33,9 +33,23 @@ body, html { height: 100%; }
   <div id="control">
     <div ng-app="posts" id="postits">
       <div ng-controller="dialogCtrl" class="md-padding" ng-cloak>
-	<md-button class="md-primary md-raised" ng-click="showDialog($event)">
-	  Create
-	</md-button>
+	<md-menu md-offset="0 7">
+	  <md-button aria-label="menu" ng-click="$mdOpenMenu($event)">
+	    &#9776; Menu
+	  </md-button>
+	  <md-menu-content width="2">
+	    <md-menu-item>
+	      <md-button ng-click="showDialog($event)">
+		Create
+	      </md-button>
+	    </md-menu-item>
+	    <md-menu-item>
+	      <md-button redirect="/postit/logout">
+		Logout
+	      </md-button>
+	    </md-menu-item>
+	  </md-menu-content>
+	</md-menu>
       </div>
       
       <div ng-controller="postsCtrl" ng-cloak>
@@ -106,7 +120,7 @@ posts.controller('dialogCtrl', function($scope, $mdDialog, $rootScope, $http) {
 	    );
 	});
     };
-})
+});
 
 function DialogController($scope, $mdDialog) {
   $scope.hide = function() { $mdDialog.hide(); };
@@ -115,6 +129,23 @@ function DialogController($scope, $mdDialog) {
     $mdDialog.hide($scope.note); 
   };
 }
+
+// From
+// http://stackoverflow.com/questions/15847726/is-there-a-simple-way-to-use-button-to-navigate-page-as-a-link-does-in-angularjs
+posts.directive('redirect', function($location) {
+    return function (scope, element, attrs) {
+	var path;
+	attrs.$observe('redirect', function(val) {
+	    path = val;
+	});
+	element.bind('click', function() {
+	    scope.$apply(function() {
+		location.href = path;
+		//$location.path(path);
+	    });
+	});
+    };
+});
 --></script>
 </body>
 </html>

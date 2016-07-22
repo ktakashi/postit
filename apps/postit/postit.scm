@@ -44,6 +44,7 @@
 	    (postit entities)
 	    (postit constants)
 	    (postit handlers)
+	    (postit auth)
 	    (text json)
 	    (srfi :19)
 	    (srfi :39)
@@ -81,81 +82,65 @@
      (username :converter utf8->string)
      (note     :converter utf8->string)))
 
-  (define (create-postit req) 
-    (define request (cuberteria-map-http-request! (make <create-request>) req))
-
-    (parameterize ((current-directory 
-		    (plato-current-path 
-		     (plato-parent-context (*plato-current-context*))))
-		   (*json-map-type* 'alist))
-      (let* ((user (car (maquette-query maquette-context <user>
-			  `(= username ,(slot-ref request 'username)))))
-	     (r (make <postit>
-		  :user user
-		  :state (make <state> :name "New" :id 0) ;; FIXME
-		  :postit (slot-ref request 'note))))
-	(with-maquette-transaction maquette-context
-				   (maquette-save maquette-context r))
-	(values 200 'application/json 
-		(json->string 
-		 (cuberteria-object->json
-		  (car (maquette-query maquette-context <postit>
-				       `(= id ,(slot-ref r 'id))))))))))
+  (define create-postit
+    (cuberteria-object-mapping-handler
+     <create-request>
+     (lambda (request req)
+       (parameterize ((current-directory 
+		       (plato-current-path 
+			(plato-parent-context (*plato-current-context*))))
+		      (*json-map-type* 'alist))
+	 (let* ((user (car (maquette-query maquette-context <user>
+			     `(= username ,(slot-ref request 'username)))))
+		(r (make <postit>
+		     :user user
+		     :state (make <state> :name "New" :id 0) ;; FIXME
+		     :postit (slot-ref request 'note))))
+	   (with-maquette-transaction maquette-context
+				      (maquette-save maquette-context r))
+	   (values 200 'application/json 
+		   (json->string 
+		    (cuberteria-object->json
+		     (car (maquette-query maquette-context <postit>
+					  `(= id ,(slot-ref r 'id))))))))))))
 
   (define-class <id-request> (<converter-mixin>)
     ((id   :converter utf8->integer)))
 
-  (define-class <position-update-request> (<id-request> <converter-mixin>)
-    ((top  :converter utf8->integer)
-     (left :converter utf8->integer)))
-  (define-method write-object ((o <position-update-request>) out)
-    (format out "#<position-update-request id=~s top=~s left=~s>"
-	    (slot-ref o 'id) (slot-ref o 'top) (slot-ref o 'left)))
-
-  (define (remove-postit req)
-    (define request (cuberteria-map-http-request! 
-		     (make <id-request>) req))
-    (parameterize ((current-directory 
-		    (plato-current-path 
-		     (plato-parent-context (*plato-current-context*)))))
-      (with-maquette-transaction maquette-context
-        (maquette-remove maquette-context
-			 (make <postit>
-			   :id (slot-ref request 'id))))
-      (values 200 'text/plan "OK")))
+  (define remove-postit
+    (cuberteria-object-mapping-handler <id-request>
+     (lambda (request req)
+       (parameterize ((current-directory 
+		       (plato-current-path 
+			(plato-parent-context (*plato-current-context*)))))
+	 (with-maquette-transaction maquette-context
+	   (maquette-remove maquette-context
+			    (make <postit>
+			      :id (slot-ref request 'id))))
+	 (values 200 'text/plan "OK")))))
 
   (define-class <username&password> (<converter-mixin>)
     ((username :converter utf8->string)
      (password :converter utf8->string)))
-  (define (generate-authorisation-token username password timestamp)
-    "authorised!")
-  (define (authorise username password) #f)
-  
+
+  (define +dashboard+ "/postit/dashboard")
   (define authorisation-handler
     (plato-session-handler
-     (lambda (req)
-       (define +dashboard+ "/postit/dashboard")
-       (define (handle-anonymous)
-	 ;; just set dummy value, it's anonymous anyway
-	 (plato-session-set! (*plato-current-session*) :auth-token "anonymous")
-	 (values 302 'text/plain +dashboard+))
-       (define (handle-users request)
-	 (plato-session-set! (*plato-current-session*) :auth-token
-	   (generate-authorisation-token
-	    (slot-ref request 'username)
-	    (slot-ref request 'password)
-	    (plato-session-ref (*plato-current-session*) :created)))
-	 (values 302 'text/plain "/postit/dashboard"))
-       (define request
-	 (cuberteria-map-http-request! (make <username&password>) req))
+     (cuberteria-object-mapping-handler <username&password>
+      (lambda (request req)
+	(define (handle-login request)
+	  (plato-session-set! (*plato-current-session*) :auth-token
+	    (generate-authorisation-token request
+	      (session->salt  (*plato-current-session*))))
+	  (values 302 'text/plain +dashboard+))
        (cond ((string=? (slot-ref request 'username) "anonymous")
-	      (handle-anonymous))
+	      (handle-login req))
 	     ((authorise (slot-ref request 'username)
 			 (slot-ref request 'password))
-	      (handle-users request))
+	      (handle-login req))
 	     (else
 	      ;; fallback to next handler
-	      (values 403 'text/plain "Username or password is invalid"))))))
+	      (values 403 'text/plain "Username or password is invalid")))))))
   
   (define (mount-paths)
     `( 
@@ -173,12 +158,18 @@
       ((GET)  "/dashboard" ,(session-expired-redirect-handler
 			     "/postit/login"
 			     (tapas-request-handler main-handler)))
-      ((POST) "/login" ,(redirect-handler authorisation-handler
-					  entry-point))
+      ((POST) "/login" ,(redirect-handler authorisation-handler))
       ((GET) "/login" ,entry-point)
+      ((GET POST) "/logout" ,(plato-session-handler logout-handler))
       ))
   (define (support-methods) '(GET))
 
+  (define logout-handler
+    (redirect-handler
+     (lambda (req)
+       (plato-session-delete! (*plato-current-session*) :auth-token)
+       (values 302 'text/plain +dashboard+))))
+  
   (define (main-handler req)
     (define root-path (plato-current-path (*plato-root-context*)))
     (call-with-input-file (build-path root-path "main.html")
@@ -188,7 +179,16 @@
     (define root-path (plato-current-path (*plato-root-context*)))
     (call-with-input-file (build-path root-path "login.html")
       html->tapas-component))
-
+  
   (define entry-point
-    (tapas-request-handler login-handler))
+    (let ((login (tapas-request-handler login-handler)))
+      (plato-session-handler
+       (redirect-handler
+	(lambda (req)
+	  (define session (*plato-current-session*))
+	  (define salt (session->salt session))
+	  (let ((token (plato-session-ref session :auth-token)))
+	    (if (validate-authorisation-token req salt token)
+		(values 302 'text/plain +dashboard+)
+		(login req))))))))
 )

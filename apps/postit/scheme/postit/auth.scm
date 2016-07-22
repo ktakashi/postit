@@ -1,6 +1,6 @@
 ;;; -*- mode:scheme; coding:utf-8; -*-
 ;;;
-;;; handlers.scm - Utility HTTP handlers
+;;; auth.scm - Authorisation
 ;;;  
 ;;;   Copyright (c) 2016  Takashi Kato  <ktakashi@ymail.com>
 ;;;   
@@ -28,28 +28,42 @@
 ;;;   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;;  
 
-(library (postit handlers)
-  (export redirect-handler
-	  session-expired-redirect-handler)
+(library (postit auth)
+  (export authorise
+	  generate-authorisation-token
+	  validate-authorisation-token
+	  session->salt)
   (import (rnrs)
+	  (paella)
 	  (plato)
-	  (postit auth))
+	  (math)
+	  (sagittarius)
+	  (rfc :5322))
 
-(define (redirect-handler handler)
-  (lambda (req)
-    (let-values (((status mime content . rest) (handler req)))
-      (if (<= 300 status 399)
-	  (apply values status mime "" (cons (list "Location" content) rest))
-	  ;; just return proper values
-	  (apply values status mime content rest)))))
-
-(define (session-expired-redirect-handler path next-handler)
-  (plato-session-handler
-   (lambda (req)
-     (let ((token (plato-session-ref (*plato-current-session*) :auth-token))
-	   (session (*plato-current-session*)))
-       (if (validate-authorisation-token req (session->salt session) token)
-	   (next-handler req)
-	   (values 302 'text/plain path
-		   (list "Location" path)))))))
-  )
+  ;; not sure if we do like this...
+  (define (session->salt sesion)
+    (integer->bytevector
+     (plato-session-created (*plato-current-session*))))
+  
+  (define (generate-authorisation-token request salt)
+    (let* ((h (hash-algorithm SHA-1))
+	   (bv (make-bytevector (hash-size h)))
+	   ;; FIXME this isn't a good value
+	   (ua (rfc5322-header-ref (http-request-headers request)
+				   "user-agent")))
+      (hash-init! h)
+      (hash-process! h (string->utf8 (http-request-remote-address request)))
+      (if ua
+	  (hash-process! h (string->utf8 ua))
+	  ;; FIXME should we do like this?
+	  (hash-process! h (read-sys-random)))
+      (hash-process! h salt)
+      (hash-done! h bv)
+      (number->string (bytevector->integer bv) 32)))
+  
+  (define (validate-authorisation-token request salt value)
+    (let ((expected (generate-authorisation-token request salt)))
+      (equal? expected value)))
+  
+  (define (authorise username password) #f)
+)
