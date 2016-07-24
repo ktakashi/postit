@@ -170,18 +170,24 @@
       (lambda (request raw-request)
 	(define username (slot-ref request 'username))
 	(define password (slot-ref request 'password))
+	;; maybe we should do this on Javascript
+	(define confirm (slot-ref request 'confirm))
 	
-	(let ((credential (create-credential username password)))
-	  (guard (e (else
-		     (values 200 'shtml
-			     (populate-error-message
-			      e (user-handler raw-request)))))
-	    (with-maquette-transaction maquette-context
-	      (maquette-add maquette-context 
-			    (make <user> :username username
-				  :password credential)))
-	    ;; this would redirect to login anyway
-	    (values 302 'text/plain +dashboard+))))))
+	(or (and-let* (( (string=? password confirm) )
+		       (credential (create-credential username password)))
+	      (guard (e (else
+			 (values 200 'shtml
+				 (populate-error-message
+				  e (user-handler raw-request)))))
+		(with-maquette-transaction maquette-context
+		  (maquette-add maquette-context 
+				(make <user> :username username
+				      :password credential)))
+		;; this would redirect to login anyway
+		(values 302 'text/plain +dashboard+)))
+	    (values 200 'shtml (populate-error-message
+				"Passwords are not the same"
+				(user-handler raw-request))))))
     
   
   (define (mount-paths)
