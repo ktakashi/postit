@@ -165,8 +165,10 @@
       (when c (tapas-add-components! c (format "~a" e)))
       (tapas-render-component component)))
 
+  (define-class <create-user-request> (<username&password>)
+    ((confirm :converter utf8->string)))
   (define create-user-handler
-    (cuberteria-object-mapping-handler  <username&password>
+    (cuberteria-object-mapping-handler  <create-user-request>
       (lambda (request raw-request)
 	(define username (slot-ref request 'username))
 	(define password (slot-ref request 'password))
