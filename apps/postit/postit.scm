@@ -126,29 +126,33 @@
     ((username :converter utf8->string)
      (password :converter utf8->string)))
 
-  (define +dashboard+ "/postit/dashboard")
+  (define +login+ "/postit/login")
+  (define (dashboard username)
+    (string-append "/postit/dashboard/" username))
 
   (define (retrieve-credential username)
     (and-let* ((r (maquette-query maquette-context <user>
 				  `(= username ,username)))
 	       ( (not (null? r)) ))
       (slot-ref (car r) 'password)))
-	  
+
   (define authorisation-handler
     (plato-session-handler
      (cuberteria-object-mapping-handler <username&password>
       (lambda (request req)
-	(define (handle-login request)
+	(define (handle-login request username)
 	  (plato-session-set! (*plato-current-session*) :auth-token
 	    (generate-authorisation-token request
 	      (session->salt  (*plato-current-session*))))
-	  (values 302 'text/plain +dashboard+))
+	  ;; put username for convenience
+	  (plato-session-set! (*plato-current-session*) :username username)
+	  (values 302 'text/plain (dashboard username)))
        (cond ((string=? (slot-ref request 'username) "anonymous")
-	      (handle-login req))
+	      (handle-login req "anonymous"))
 	     ((authorise (slot-ref request 'username)
 			 (slot-ref request 'password)
 			 (retrieve-credential (slot-ref request 'username)))
-	      (handle-login req))
+	      (handle-login req (slot-ref request 'username)))
 	     (else
 	      (values 200 'shtml
 		      (tapas-render-component
@@ -185,8 +189,7 @@
 		  (maquette-add maquette-context 
 				(make <user> :username username
 				      :password credential)))
-		;; this would redirect to login anyway
-		(values 302 'text/plain +dashboard+)))
+		(values 302 'text/plain +login+)))
 	    (values 200 'shtml (populate-error-message
 				"Passwords are not the same"
 				(user-handler raw-request)))))))
@@ -205,7 +208,7 @@
       ((POST) "/remove-postit" ,(session-expired-redirect-handler
 				 "/postit/login" ;; TODO
 				 remove-postit))
-      ((GET)  "/dashboard" ,(session-expired-redirect-handler
+      ((GET)  #/dashboard/ ,(session-expired-redirect-handler
 			     "/postit/login"
 			     (tapas-request-handler main-handler)))
       ((POST) "/login" ,(redirect-handler authorisation-handler))
@@ -220,7 +223,7 @@
     (redirect-handler
      (lambda (req)
        (plato-session-delete! (*plato-current-session*) :auth-token)
-       (values 302 'text/plain +dashboard+))))
+       (values 302 'text/plain +login+))))
 
   (define (static-handler file)
     (lambda (req)
@@ -239,8 +242,9 @@
 	(lambda (req)
 	  (define session (*plato-current-session*))
 	  (define salt (session->salt session))
-	  (let ((token (plato-session-ref session :auth-token)))
-	    (if (validate-authorisation-token req salt token)
-		(values 302 'text/plain +dashboard+)
+	  (let ((token (plato-session-ref session :auth-token))
+		(user (plato-session-ref session :username)))
+	    (if (and (validate-authorisation-token req salt token) user)
+		(values 302 'text/plain (dashboard user))
 		(login req))))))))
 )
