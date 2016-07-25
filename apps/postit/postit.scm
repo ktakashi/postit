@@ -187,7 +187,7 @@
 		(values 302 'text/plain +dashboard+)))
 	    (values 200 'shtml (populate-error-message
 				"Passwords are not the same"
-				(user-handler raw-request))))))
+				(user-handler raw-request)))))))
     
   
   (define (mount-paths)
