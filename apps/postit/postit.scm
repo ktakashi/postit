@@ -67,32 +67,44 @@
      (lambda (out)
        (json-write json out))))
 
+  (define-syntax with-path-variable
+    (syntax-rules ()
+      ((_ "gen" regexp (b ...) ((v d n) ...))
+       (let ((m regexp))
+	 (let ((v (if m (m n) d)) ...)
+	   b ...)))
+      ((_ "count" regexp () (b ...) (t ...) n)
+       (with-path-variable "gen" regexp (b ...) (t ...)))
+      
+      ((_ "count" regexp ((v d) v* ...) (b ...) (t ...) n)
+       (with-path-variable "count" regexp (v* ...) (b ...)
+			   ((v d (+ n 1)) t ...) (+ n 1)))
+      
+      ((_ regexp (variables ...) body ...)
+       (with-path-variable "count" regexp (variables ...) (body ...) () 0))))
+  (define +anonymous+ "anonymous")
+  
   (define (postit-loader req)
-    (parameterize ((current-directory 
-		    (plato-current-path 
-		     (plato-parent-context (*plato-current-context*))))
-		   (*json-map-type* 'alist))      
-      (define anon (make <user> :id 0))
-      (let ((r (maquette-query maquette-context <postit> `(= user ,anon))))
-	(values 200 'application/json
-		(json->string (list->vector 
-			       (map cuberteria-object->json r)))))))
+    (define uri (http-request-uri req))
+    (with-path-variable (#/load-postit\/(.+)/ uri) ((user +anonymous+))
+      (parameterize ((*json-map-type* 'alist))      
+	(define u (make <user> :username user))
+	(let ((r (maquette-query maquette-context <postit> `(= user ,u))))
+	  (values 200 'application/json
+		  (json->string (list->vector 
+				 (map cuberteria-object->json r))))))))
 
   (define (utf8->integer bv) (string->number (utf8->string bv)))
   ;; this now does update as well.
   (define-class <create-request> (<converter-mixin>)
-    ((id       :converter utf8->integer)
-     (username :converter utf8->string)
-     (note     :converter utf8->string)))
+    (username
+     note))
 
   (define create-postit
     (cuberteria-object-mapping-handler
      <create-request>
      (lambda (request req)
-       (parameterize ((current-directory 
-		       (plato-current-path 
-			(plato-parent-context (*plato-current-context*))))
-		      (*json-map-type* 'alist))
+       (parameterize ((*json-map-type* 'alist))
 	 (let* ((user (car (maquette-query maquette-context <user>
 			     `(= username ,(slot-ref request 'username)))))
 		(r (make <postit>
@@ -105,7 +117,8 @@
 		   (json->string 
 		    (cuberteria-object->json
 		     (car (maquette-query maquette-context <postit>
-					  `(= id ,(slot-ref r 'id))))))))))))
+					  `(= id ,(slot-ref r 'id))))))))))
+     :json? #t))
 
   (define-class <id-request> (<converter-mixin>)
     ((id   :converter utf8->integer)))
@@ -223,6 +236,7 @@
     (redirect-handler
      (lambda (req)
        (plato-session-delete! (*plato-current-session*) :auth-token)
+       (plato-session-delete! (*plato-current-session*) :username)
        (values 302 'text/plain +login+))))
 
   (define (static-handler file)

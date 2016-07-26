@@ -111,7 +111,7 @@ posts.controller('postsCtrl', function($scope, $http, $rootScope, $location) {
     $scope.load();// is there a better way?
 });
 
-posts.controller('dialogCtrl', function($scope, $mdDialog, $rootScope, $http) {
+posts.controller('dialogCtrl', function($scope, $mdDialog, $rootScope, $http,  $location) {
 
     $scope.showDialog = function(ev) {
 	$mdDialog.show({
@@ -121,11 +121,11 @@ posts.controller('dialogCtrl', function($scope, $mdDialog, $rootScope, $http) {
 	    targetEvent: ev,
 	    clickOutsideToClose: true
 	}).then(function(note) {
-	    var data = "username=anonymous&note=" + encodeURIComponent(note);
+	    var user = $location.path().substring(1);
+	    var data = {'username': user, 'note': note};
 	    $http({
 		method: 'POST',
 		url: "/postit/create-postit",
-		headers: {'Content-Type': 'application/x-www-form-urlencoded'},
 		data: data
 	    }).then(
 		function() {
