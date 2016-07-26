@@ -67,7 +67,8 @@
 (define-class <user> (<entity/date>)
   ((username :init-keyword :username :sql-type '(varchar2 255) :unique #t
 	     :not-null? #t)
-   (password :init-keyword :password :sql-type '(varchar2 255) :not-null? #t))
+   (password :init-keyword :password :sql-type '(varchar2 255) :not-null? #t
+	     :json-element-name :discard))
   :metaclass <maquette-table-meta>
   :table-name 'users)
 
