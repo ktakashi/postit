@@ -3,14 +3,31 @@
 <head>
   <meta charset="utf-8">
   <title>Create user</title>
+  <link rel="stylesheet" type="text/css" href="styles/userform.css"/>
 </head>
 <body>
-  <div id="error_message" />
-  <form action="/postit/user" method="post">
-    <div>Username: <input type="text" name="username" /></div>
-    <div>Password: <input type="password" name="password" /></div>
-    <div>Confirm: <input type="password" name="confirm" /></div>
-    <input type="submit" value="Create" />
-  </form>
+  <div class="container">
+    <div class="content">
+      <form action="/postit/user" method="post">
+	<div class="grid">
+	  <div class="row">
+	    <span class="element">Username:</span>
+	    <input type="text" name="username" />
+	  </div>
+	  <div class="row">
+	    <span class="element">Password:</span>
+	    <input type="password" name="password" />
+	  </div class="row">
+	  <div class="row">
+	    <span class="element">Confirm:</span>
+	    <input type="password" name="confirm" />
+	  </div>
+	  <div class="buttons">
+	    <input type="submit" value="Create" />
+	  </div>
+      </form>
+      <div id="error_message" class="error"/>
+    </div>
+  </div>
 </body>
 </html>

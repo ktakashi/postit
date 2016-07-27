@@ -3,16 +3,31 @@
 <head>
   <meta charset="utf-8">
   <title>login</title>
+  <link rel="stylesheet" type="text/css" href="styles/userform.css"/>
 </head>
 <body>
-  <div>
-    <div id="error_message" />
-    <form action="/postit/login" method="post">
-      <div>Username: <input type="text" name="username" /></div>
-      <div>Password: <input type="password" name="password" /></div>
-      <input type="submit" value="Login" />
-    </form>
-    <a href="/postit/user">Sign up</a>
+  <div class="container">
+    <div class="content">
+      <form action="/postit/login" method="post">
+	<div class="grid">
+	  <div class="row">
+	    <span class="element">Username:</span> 
+	    <input type="text" name="username" />
+	  </div>
+	  <div class="row">
+	    <span class="element">Password:</span>
+	    <input type="password" name="password" />
+	  </div>
+	  <div class="buttons">
+	    <input type="submit" value="Login" />
+	    <input type="button" value="Login as anonymous" 
+		   onclick="this.form.elements['username'].value = 'anonymous'; this.form.submit()" />
+	  </div>
+	</div>
+      </form>
+      <a href="/postit/user">Sign up</a>
+      <div id="error_message" class="error"/>
+    </div>
   </div>
 </body>
 </html>

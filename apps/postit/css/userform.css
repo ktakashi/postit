@@ -1,0 +1,27 @@
+div.container {
+    height: 100vh;
+    position: relative;
+}
+div.container div.content {
+    margin: 0;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-right: -50%;
+    transform: translate(-50%, -50%);
+}
+div.grid {
+    position: relative;
+}
+div.grid span.element {
+    display: inline-block;
+    width: 30%;
+}
+
+div.error {
+    color: red;
+}
+
+div.buttons {
+    text-align: center;
+}

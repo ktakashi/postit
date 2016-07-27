@@ -49,6 +49,7 @@
 	    (postit handlers)
 	    (postit auth)
 	    (text json)
+	    (srfi :13)
 	    (srfi :19)
 	    (srfi :39)
 	    (clos user))
@@ -192,7 +193,9 @@
 	;; maybe we should do this on Javascript
 	(define confirm (slot-ref request 'confirm))
 	
-	(or (and-let* (( (string=? password confirm) )
+	(or (and-let* (( (not (string-null? username)) )
+		       ( (not (string-null? password)) )
+		       ( (string=? password confirm) )
 		       (credential (create-credential username password)))
 	      (guard (e (else
 			 (values 200 'shtml
@@ -203,6 +206,14 @@
 				(make <user> :username username
 				      :password credential)))
 		(values 302 'text/plain +login+)))
+	    (and (string-null? username)
+		 (values 200 'shtml (populate-error-message 
+				     "Username is empty"
+				     (user-handler raw-request))))
+	    (and (string-null? password)
+		 (values 200 'shtml (populate-error-message 
+				     "Password is empty"
+				     (user-handler raw-request))))
 	    (values 200 'shtml (populate-error-message
 				"Passwords are not the same"
 				(user-handler raw-request)))))))
