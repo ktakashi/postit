@@ -49,6 +49,8 @@
   (let-values (((driver op alist) (dbi-parse-dsn +dsn+)))
     (eval 'generator (environment `(postit ,(string->symbol driver))))))
 
+;; utility
+(define (object->json o) (cuberteria-object->json o 'alist))
 ;; base class
 (define-class <entity> ()
   ((id :init-keyword :id :primary-key #t :generator postit-generator))
@@ -76,7 +78,7 @@
 (define-class <user-info> (<entity>)
   ((user :init-keyword :user :foreign-key (list <user> 'id) :not-null? #t
 	 :column-name "userid"
-	 :->json cuberteria-object->json)
+	 :->json object->json)
    (first-names :init-keyword :first-names :not-null? #t
 		:column-name "first_names")
    (middle-name :init-keyword :middle-name :column-name "middle_name")
@@ -94,11 +96,11 @@
 (define-class <postit> (<entity/date>)
   ((user :init-keyword :user :foreign-key (list <user> 'id) :not-null? #t
 	 :column-name "userid"
-	 :->json cuberteria-object->json)
+	 :->json object->json)
    (postit :init-keyword :postit :sql-type 'clob
 	   :json-element-name "note")
    (state :init-keyword :state :foreign-key (list <state> 'id) :not-null? #t
 	  :column-name "stateid"
-	  :->json cuberteria-object->json))
+	  :->json object->json))
   :metaclass <maquette-table-meta>)
   )

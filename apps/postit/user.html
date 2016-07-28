@@ -3,27 +3,29 @@
 <head>
   <meta charset="utf-8">
   <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular.min.js"></script>
+  <script src="/postit/scripts/directives.js"></script>
   <title>Create user</title>
   <link rel="stylesheet" type="text/css" href="/postit/styles/userform.css"/>
 </head>
 <body>
-  <div class="container">
+  <div ng-app="registration" class="container">
     <div class="content" style="width: 50%;"
-	 ng-controller="ValidationController">
-      <form action="/postit/user" method="post">
+	 ng-controller="UserController">
+      <form action="#" method="post" name="userForm">
 	<div class="input-form">
 	  <div class="grid">
 	    <div class="row">
 	      <span class="element">Username:</span>
-	      <input type="text" name="username" required/>
+	      <input type="text" ng-model="user.username" required/>
 	    </div>
 	    <div class="row">
 	      <span class="element">Password:</span>
-	      <input type="password" name="password" required/>
+	      <input type="password" ng-model="user.password" required
+		     compare-to="user.confirm"/>
 	    </div class="row">
 	    <div class="row">
 	      <span class="element">Confirm:</span>
-	      <input type="password" name="confirm" required/>
+	      <input type="password" ng-model="user.confirm"/>
 	    </div>
 	  </div>
 	</div>
@@ -31,31 +33,64 @@
 	  <div class="grid">
 	    <div class="row">
 	      <span class="element">First names</span>
-	      <input type="text" name="firstnames" required/>
+	      <input type="text" ng-model="user.info.firstnames" required/>
 	    </div>
 	    <div class="row">
 	      <span class="element">Middle name</span>
-	      <input type="text" name="middlenames" />
+	      <input type="text" ng-model="user.info.middlename" />
 	    </div>
 	    <div class="row">
 	      <span class="element">Last name</span>
-	      <input type="text" name="lastname" required />
+	      <input type="text" ng-mode="user.info.lastname" required />
 	    </div class="row">
 	    <div class="row">
 	      <span class="element">Email address:</span>
-	      <input type="email" name="email" />
+	      <input type="email" ng-model="user.info.email" />
 	    </div>
 	  </div>
 	</div>
 	<div class="buttons">
-	  <input type="submit" value="Create" />
+	  <input type="button" value="Create" ng-click="submit('userForm')"/>
 	</div>
       </form>
     </div>
-    <div id="error_message" class="error"/>
+    <div ng-show="error.hasError" class="error">{{error.errorMessage}}</div>
   </div>
   <script><!--
-angular.module('validation', []).controller('ValidationController');
+var m = angular.module('registration', []);
+m.controller('UserController', function($scope, $http) {
+    $scope.user = {
+	username: "",
+	password: "",
+	confirm: "",
+	info: {
+	    firstnames: "",
+	    middlename: "",
+	    lastname: "",
+	    email: ""
+	}
+    };
+    $scope.error = {
+	hasError: false,
+	errorMessage: ""
+    };
+    $scope.submit = function (form) {
+	if ($scope[form].$valid) {
+	    $http.post('/postit/user', $scope.user)
+		.then(
+		    function(response) {
+			if (response.data.error) {
+			    $scope.error.hasError = true;
+			    $scope.error.errorMessage = response.data.error;
+			    console.log($scope);
+			} else {
+			    location.href = '/postit/login';
+			}
+		    });
+	}
+    };
+});
+add_compare_to(m);
 --></script>
 </body>
 </html>

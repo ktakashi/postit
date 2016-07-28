@@ -1,7 +1,7 @@
-(function () {
+
+function add_draggable(module) {
     // from https://docs.angularjs.org/guide/directive
-    var m = angular.module('draggable', []);
-    m.directive('postitDraggable', ['$document', function($document) {
+    module.directive('postitDraggable', function($document) {
 	return {
 	    link: function(scope, element, attr) {
 		var startX = 0, startY = 0, x = 0, y = 0;
@@ -35,5 +35,27 @@
 		}
 	    }
 	};
-    }]);
-})()
+    });
+}
+
+function add_compare_to(module) {
+    // from http://odetocode.com/blogs/scott/archive/2014/10/13/confirm-password-validation-in-angularjs.aspx
+    module.directive('compareTo', function() {
+	return {
+            require: "ngModel",
+            scope: {
+		otherModelValue: "=compareTo"
+            },
+            link: function(scope, element, attributes, ngModel) {
+		
+		ngModel.$validators.compareTo = function(modelValue) {
+                    return modelValue === scope.otherModelValue;
+		};
+		
+		scope.$watch("otherModelValue", function() {
+                    ngModel.$validate();
+		});
+            }
+	};
+    })
+}

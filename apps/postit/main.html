@@ -12,7 +12,7 @@
   <script src="http://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-resource.min.js"></script>
   <!-- Angular Material Library -->
   <script src="http://ajax.googleapis.com/ajax/libs/angular_material/1.1.0-rc4/angular-material.min.js"></script>
-  <script src="/postit/scripts/draggable.js"></script>
+  <script src="/postit/scripts/directives.js"></script>
   <style>
 body, html { height: 100%; }
 .draggable {
@@ -69,8 +69,7 @@ var posts = angular.module('posts',
 			   ['ngMaterial',
 			    'ngMessages',
 			    'ngResource',
-			    'ngRoute',
-			    'draggable']);
+			    'ngRoute']);
 
 function check_redirect(response, next) {
     if (typeof response.data === "string" && response.data != "OK") {
@@ -172,6 +171,8 @@ posts.directive('redirect', function($location) {
 	});
     };
 });
+
+add_draggable(posts);
 --></script>
 </body>
 </html>

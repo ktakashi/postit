@@ -63,11 +63,6 @@
   (define maquette-context 
     (apply make-maquette-context +dsn+ :auto-commit #f +auth+))
 
-  (define (json->string json)
-    (call-with-string-output-port
-     (lambda (out)
-       (json-write json out))))
-
   (define-syntax with-path-variable
     (syntax-rules ()
       ((_ "gen" regexp (b ...) ((v d n) ...))
@@ -84,41 +79,47 @@
       ((_ regexp (variables ...) body ...)
        (with-path-variable "count" regexp (variables ...) (body ...) () 0))))
   (define +anonymous+ "anonymous")
+
+  (define (return-json obj)
+    (define (json->string json)
+      (call-with-string-output-port
+       (lambda (out)
+	 (json-write json out))))
+    
+    (parameterize ((*json-map-type* 'alist))
+      (values 200 'application/json (json->string obj))))
+  
+  (define (object->json o) (cuberteria-object->json o 'alist))
   
   (define (postit-loader req)
-    (define uri (http-request-uri req))
+    (define uri (http-request-uri req))    
     (with-path-variable (#/load-postit\/(.+)/ uri) ((user +anonymous+))
-      (parameterize ((*json-map-type* 'alist))      
-	(define u (make <user> :username user))
-	(let ((r (maquette-query maquette-context <postit> `(= user ,u))))
-	  (values 200 'application/json
-		  (json->string (list->vector 
-				 (map cuberteria-object->json r))))))))
+      (define u (make <user> :username user))
+      (let ((r (maquette-query maquette-context <postit> `(= user ,u))))
+	(return-json (list->vector (map object->json r))))))
 
   (define (utf8->integer bv) (string->number (utf8->string bv)))
   ;; this now does update as well.
   (define-class <create-request> (<converter-mixin>)
     (username
      note))
-
+  
   (define create-postit
     (cuberteria-object-mapping-handler
      <create-request>
      (lambda (request req)
-       (parameterize ((*json-map-type* 'alist))
-	 (let* ((user (car (maquette-query maquette-context <user>
-			     `(= username ,(slot-ref request 'username)))))
-		(r (make <postit>
-		     :user user
-		     :state (make <state> :name "New" :id 0) ;; FIXME
-		     :postit (slot-ref request 'note))))
-	   (with-maquette-transaction maquette-context
-				      (maquette-save maquette-context r))
-	   (values 200 'application/json 
-		   (json->string 
-		    (cuberteria-object->json
-		     (car (maquette-query maquette-context <postit>
-					  `(= id ,(slot-ref r 'id))))))))))
+       (let* ((user (car (maquette-query maquette-context <user>
+			   `(= username ,(slot-ref request 'username)))))
+	      (r (make <postit>
+		   :user user
+		   :state (make <state> :name "New" :id 0) ;; FIXME
+		   :postit (slot-ref request 'note))))
+	 (with-maquette-transaction maquette-context
+				    (maquette-save maquette-context r))
+	 (return-json
+	  (object->json 
+	   (car (maquette-query maquette-context <postit>
+				`(= id ,(slot-ref r 'id))))))))
      :json? #t))
 
   (define-class <id-request> (<converter-mixin>)
@@ -183,34 +184,35 @@
       (when c (tapas-add-components! c (format "~a" e)))
       (tapas-render-component component)))
 
-  (define-class <create-user-request> (<username&password>)
-    ((confirm :converter utf8->string)
-     (firstnames :converter utf8->string)
+  (define-class <userinfo> ()
+    ((firstnames :converter utf8->string)
      (middlename :converter utf8->string)
      (lastname :converter utf8->string)
-     (email :converter utf8->string)
-     ))
+     (email :converter utf8->string)))
+  (define-class <create-user-request> ()
+    ((username :converter utf8->string)
+     (password :converter utf8->string)
+     (info :json <userinfo>)))
+  
   (define create-user-handler
     (cuberteria-object-mapping-handler  <create-user-request>
       (lambda (request raw-request)
 	(define username (slot-ref request 'username))
 	(define password (slot-ref request 'password))
-	;; maybe we should do this on Javascript
-	(define confirm (slot-ref request 'confirm))
+	(define info (slot-ref request 'info))
 	(define (get field)
-	  (if (slot-bound? request field)
-	      (slot-ref request field)
+	  (if (slot-bound? info field)
+	      (slot-ref info field)
 	      ;; () is the null
 	      '())) 
 	
 	(or (and-let* (( (not (string-null? username)) )
 		       ( (not (string-null? password)) )
-		       ( (string=? password confirm) )
 		       (credential (create-credential username password)))
 	      (guard (e (else
-			 (values 200 'shtml
-				 (populate-error-message
-				  e (user-handler raw-request)))))
+			 ;; TODO better error reporting
+			 (return-json
+			  `((error . ,(format "Failed to create a user"))))))
 		(with-maquette-transaction maquette-context
 		  (let ((user (maquette-add maquette-context 
 					    (make <user> :username username
@@ -222,18 +224,13 @@
 				    :middle-name (get 'middlename)
 				    :last-names (get 'lastname)
 				    :email (get 'email)))))
-		(values 302 'text/plain +login+)))
+		(return-json '((success . #t)))))
 	    (and (string-null? username)
-		 (values 200 'shtml (populate-error-message 
-				     "Username is empty"
-				     (user-handler raw-request))))
+		 (return-json '((error . "Username is empty"))))
 	    (and (string-null? password)
-		 (values 200 'shtml (populate-error-message 
-				     "Password is empty"
-				     (user-handler raw-request))))
-	    (values 200 'shtml (populate-error-message
-				"Passwords are not the same"
-				(user-handler raw-request)))))))
+		 (return-json '((error . "Password is empty"))))
+	    (return-json '((error . "Something went wrong")))))
+      :json? #t))
     
   
   (define (mount-paths)
