@@ -66,6 +66,7 @@
          (handler (make-shutdown-handler shared-queue)))
     (values (make-http-server-config
 	     :max-thread max-thread
+	     :use-ipv6? #t
 	     :shutdown-port (and p shutdown-port)
 	     :shutdown-handler handler)
 	    shared-queue)))
