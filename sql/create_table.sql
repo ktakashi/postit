@@ -17,7 +17,8 @@ create table user_info (
        userid integer            not null,
        first_names varchar(255) not null,
        middle_name varchar(255),
-       last_name   varchar(255) not null
+       last_name   varchar(255) not null,
+       email       varchar(255)
        -- TODO more?
 );
 

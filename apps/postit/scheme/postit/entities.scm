@@ -32,6 +32,7 @@
   (export <entity>
 	  <entity/date>
 	  <user>
+	  <user-info>
 	  <state>
 	  <postit>)
   (import (rnrs)
@@ -71,6 +72,19 @@
 	     :json-element-name :discard))
   :metaclass <maquette-table-meta>
   :table-name 'users)
+
+(define-class <user-info> (<entity>)
+  ((user :init-keyword :user :foreign-key (list <user> 'id) :not-null? #t
+	 :column-name "userid"
+	 :->json cuberteria-object->json)
+   (first-names :init-keyword :first-names :not-null? #t
+		:column-name "first_names")
+   (middle-name :init-keyword :middle-name :column-name "middle_name")
+   (last-name :init-keyword :last-names :not-null? #t
+	      :column-name "last_name")
+   (email :init-keyword :email))
+  :metaclass <maquette-table-meta>
+  :table-name 'user_info)
 
 (define-class <state> (<entity>)
   ((name :init-keyword :name :sql-type '(varchar2 50)

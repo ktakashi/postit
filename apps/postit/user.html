@@ -2,32 +2,60 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular.min.js"></script>
   <title>Create user</title>
   <link rel="stylesheet" type="text/css" href="/postit/styles/userform.css"/>
 </head>
 <body>
   <div class="container">
-    <div class="content">
+    <div class="content" style="width: 50%;"
+	 ng-controller="ValidationController">
       <form action="/postit/user" method="post">
-	<div class="grid">
-	  <div class="row">
-	    <span class="element">Username:</span>
-	    <input type="text" name="username" />
+	<div class="input-form">
+	  <div class="grid">
+	    <div class="row">
+	      <span class="element">Username:</span>
+	      <input type="text" name="username" required/>
+	    </div>
+	    <div class="row">
+	      <span class="element">Password:</span>
+	      <input type="password" name="password" required/>
+	    </div class="row">
+	    <div class="row">
+	      <span class="element">Confirm:</span>
+	      <input type="password" name="confirm" required/>
+	    </div>
 	  </div>
-	  <div class="row">
-	    <span class="element">Password:</span>
-	    <input type="password" name="password" />
-	  </div class="row">
-	  <div class="row">
-	    <span class="element">Confirm:</span>
-	    <input type="password" name="confirm" />
+	</div>
+	<div class="input-form">
+	  <div class="grid">
+	    <div class="row">
+	      <span class="element">First names</span>
+	      <input type="text" name="firstnames" required/>
+	    </div>
+	    <div class="row">
+	      <span class="element">Middle name</span>
+	      <input type="text" name="middlenames" />
+	    </div>
+	    <div class="row">
+	      <span class="element">Last name</span>
+	      <input type="text" name="lastname" required />
+	    </div class="row">
+	    <div class="row">
+	      <span class="element">Email address:</span>
+	      <input type="email" name="email" />
+	    </div>
 	  </div>
-	  <div class="buttons">
-	    <input type="submit" value="Create" />
-	  </div>
+	</div>
+	<div class="buttons">
+	  <input type="submit" value="Create" />
+	</div>
       </form>
-      <div id="error_message" class="error"/>
     </div>
+    <div id="error_message" class="error"/>
   </div>
+  <script><!--
+angular.module('validation', []).controller('ValidationController');
+--></script>
 </body>
 </html>

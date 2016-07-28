@@ -16,6 +16,7 @@ div.grid {
 div.grid span.element {
     display: inline-block;
     width: 30%;
+    white-space: nowrap;
 }
 
 div.error {
@@ -24,4 +25,9 @@ div.error {
 
 div.buttons {
     text-align: center;
+}
+
+div.container div.input-form {
+    width: 50%;
+    float: left;
 }

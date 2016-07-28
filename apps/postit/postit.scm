@@ -184,7 +184,12 @@
       (tapas-render-component component)))
 
   (define-class <create-user-request> (<username&password>)
-    ((confirm :converter utf8->string)))
+    ((confirm :converter utf8->string)
+     (firstnames :converter utf8->string)
+     (middlename :converter utf8->string)
+     (lastname :converter utf8->string)
+     (email :converter utf8->string)
+     ))
   (define create-user-handler
     (cuberteria-object-mapping-handler  <create-user-request>
       (lambda (request raw-request)
@@ -192,6 +197,11 @@
 	(define password (slot-ref request 'password))
 	;; maybe we should do this on Javascript
 	(define confirm (slot-ref request 'confirm))
+	(define (get field)
+	  (if (slot-bound? request field)
+	      (slot-ref request field)
+	      ;; () is the null
+	      '())) 
 	
 	(or (and-let* (( (not (string-null? username)) )
 		       ( (not (string-null? password)) )
@@ -202,9 +212,16 @@
 				 (populate-error-message
 				  e (user-handler raw-request)))))
 		(with-maquette-transaction maquette-context
-		  (maquette-add maquette-context 
-				(make <user> :username username
-				      :password credential)))
+		  (let ((user (maquette-add maquette-context 
+					    (make <user> :username username
+						  :password credential))))
+		    (maquette-add maquette-context
+				  (make <user-info>
+				    :user user
+				    :first-names (get 'firstnames)
+				    :middle-name (get 'middlename)
+				    :last-names (get 'lastname)
+				    :email (get 'email)))))
 		(values 302 'text/plain +login+)))
 	    (and (string-null? username)
 		 (values 200 'shtml (populate-error-message 
