@@ -72,6 +72,15 @@ var posts = angular.module('posts',
 			    'ngMessages',
 			    'ngResource',
 			    'ngRoute']);
+
+function check_redirect(response, next) {
+    if (typeof response.data === "string" && response.data != "OK") {
+	location.href = "/postit/logout";
+    } else {
+	next();
+    }
+}
+
 posts.config(function($locationProvider) {
     $locationProvider.html5Mode({
 	enabled: true
@@ -88,7 +97,9 @@ posts.controller('postsCtrl', function($scope, $http, $rootScope, $location) {
 	$http.get("/postit/load-postit" + $location.path())
             .then(
 		function(response) {
-		    $scope.posts = response.data;
+		    check_redirect(response, function() {
+			$scope.posts = response.data;
+		    });
 		},
 		function(response) {
 		    $scope.posts = [];
@@ -103,7 +114,7 @@ posts.controller('postsCtrl', function($scope, $http, $rootScope, $location) {
 	    data: "id=" + id
 	}).then(
 	    function(response) {
-		$scope.load();
+		check_redirect(response, $scope.load);
 	    },
 	    function(response) {
 	    });
@@ -128,8 +139,10 @@ posts.controller('dialogCtrl', function($scope, $mdDialog, $rootScope, $http,  $
 		url: "/postit/create-postit",
 		data: data
 	    }).then(
-		function() {
-		    $rootScope.$emit("reload", {});
+		function(response) {
+		    check_redirect(response, function() {
+			$rootScope.$emit("reload", {});
+		    });
 		}
 	    );
 	});
